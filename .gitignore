@@ -1,0 +1,5 @@
+.vscode
+.idea
+env/
+adcm_pytest_plugin.egg-info
+__pycache__

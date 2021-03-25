@@ -1,0 +1,1 @@
+include src/adcm_pytest_plugin/confs_library/*.yaml
