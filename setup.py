@@ -23,17 +23,12 @@ setup(
     entry_points={"pytest11": ["adcm_pytest_plugin = adcm_pytest_plugin.plugin"]},
     # custom PyPI classifier for pytest plugins
     install_requires=[
-        "delayed_assert",
         "pytest",
         "docker",
         "adcm_client>=2020.02.11.12",
         "allure-pytest",
-        "paramiko",
-        "pytest-lazy-fixture",
         "requests",
         "version_utils",
-        "coreapi",
-        "pyyaml",
         "ifaddr",
         "retry",
         "deprecated",
