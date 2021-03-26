@@ -44,7 +44,7 @@ def assert_state(obj: BaseAPIObject, state):
 
 
 @allure.step("Assert action result to be equal to {status}")
-def assert_action_result(result: str, status: str, name=""):
+def assert_action_result(result: str, status: str, name="", additional_message=""):
     """
     Asserts action result to be equal to 'status' argument
 
@@ -58,9 +58,16 @@ def assert_action_result(result: str, status: str, name=""):
     Traceback (most recent call last):
     ...
     AssertionError: Action some_action finished execution with unexpected result - '200'. Expected - '400'
+    >>> assert_action_result("200", "500", additional_message="My custom message")
+    Traceback (most recent call last):
+    ...
+    AssertionError: Action  finished execution with unexpected result - '200'. Expected - '500'
+    My custom message
     """
-    assert result == status, (
-        f"Action {name} "
-        f"finished execution with unexpected result - '{result}'. "
+    message = (
+        f"Action {name} finished execution with unexpected result - '{result}'. "
         f"Expected - '{status}'"
     )
+    if additional_message:
+        message += f"\n{additional_message}"
+    assert result == status, message
