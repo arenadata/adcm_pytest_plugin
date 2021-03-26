@@ -262,10 +262,13 @@ class DockerWrapper:
             port = "8000"
         else:
             container_ip = ip
+        self._wait_for_container_init(container, container_ip, port)
+        return ADCM(container, container_ip, port)
 
-        init_timeout = 120
+    @staticmethod
+    def _wait_for_container_init(container, container_ip, port, timeout=120):
         if not wait_for_url(
-            "http://{}:{}/api/v1/".format(container_ip, port), init_timeout
+            "http://{}:{}/api/v1/".format(container_ip, port), timeout
         ):
             additional_message = ""
             try:
@@ -273,10 +276,9 @@ class DockerWrapper:
             except APIError:
                 additional_message = " \nWARNING: Failed to kill docker container. Try to remove it by hand"
             raise TimeoutError(
-                f"ADCM API has not responded in {init_timeout} seconds"
+                f"ADCM API has not responded in {timeout} seconds"
                 f"{additional_message}"
             )
-        return ADCM(container, container_ip, port)
 
     # pylint: disable=R0913
     @allure.step("Run ADCM container from the image {image}:{tag}")
