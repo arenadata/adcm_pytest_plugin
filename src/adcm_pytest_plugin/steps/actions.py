@@ -64,8 +64,9 @@ def _run_action_and_assert_result(
     """
     Run action and assert that status equals to 'status' argument
     """
+    obj_name = obj.name if not isinstance(obj, Host) else obj.fqdn
     with allure.step(
-        f"Perform action '{action_name}' for {obj.__class__} '{obj.name}'"
+        f"Perform action '{action_name}' for {obj.__class__} '{obj_name}'"
     ), _suggest_action_if_not_exists(obj, action_name):
         task = obj.action(name=action_name).run(**kwargs)
         result = task.wait()
