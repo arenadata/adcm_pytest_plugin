@@ -267,6 +267,7 @@ class DockerWrapper:
         if not wait_for_url(
             "http://{}:{}/api/v1/".format(container_ip, port), init_timeout
         ):
+            container.stop()
             raise TimeoutError(f"ADCM API has not responded in {init_timeout}")
         return ADCM(container, container_ip, port)
 
