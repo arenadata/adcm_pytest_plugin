@@ -66,7 +66,7 @@ def _run_action_and_assert_result(
     """
     obj_name = obj.name if not isinstance(obj, Host) else obj.fqdn
     with allure.step(
-        f"Perform action '{action_name}' for {obj.__class__} '{obj_name}'"
+        f"Perform action '{action_name}' for {obj.__class__.__name__} '{obj_name}'"
     ), _suggest_action_if_not_exists(obj, action_name):
         task = obj.action(name=action_name).run(**kwargs)
         result = task.wait()
@@ -75,7 +75,7 @@ def _run_action_and_assert_result(
             ansible_error = _get_error_text_from_task_logs(task)
         assert_action_result(
             name=action_name,
-            result=obj.action(name=action_name).run(**kwargs).wait(),
+            result=result,
             status=expected_status,
             additional_message=ansible_error,
         )
