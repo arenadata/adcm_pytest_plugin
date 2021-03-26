@@ -186,10 +186,11 @@ def _wait_for_adcm_container_init(container, container_ip, port, timeout=120):
         try:
             container.kill()
         except APIError:
-            additional_message = " \nWARNING: Failed to kill docker container. Try to remove it by hand"
+            additional_message = (
+                " \nWARNING: Failed to kill docker container. Try to remove it by hand"
+            )
         raise TimeoutError(
-            f"ADCM API has not responded in {timeout} seconds"
-            f"{additional_message}"
+            f"ADCM API has not responded in {timeout} seconds{additional_message}"
         )
 
 
