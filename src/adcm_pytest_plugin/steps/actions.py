@@ -50,8 +50,8 @@ def _extract_error_from_ansible_log(log: str):
     err_start = log.find("fatal:")
     if err_start > -1:
         task_marker = log.find("******", err_start)
-        err_end = log.rfind("\n", 0, task_marker)
-        return log[err_start : err_end + 1]
+        err_end = log.rfind("\n", 0, task_marker) + 1
+        return log[err_start:err_end]
     return None
 
 
