@@ -267,8 +267,15 @@ class DockerWrapper:
         if not wait_for_url(
             "http://{}:{}/api/v1/".format(container_ip, port), init_timeout
         ):
-            container.kill()
-            raise TimeoutError(f"ADCM API has not responded in {init_timeout} seconds")
+            additional_message = ""
+            try:
+                container.kill()
+            except APIError:
+                additional_message = " \nWARNING: Failed to kill docker container. Try to remove it by hand"
+            raise TimeoutError(
+                f"ADCM API has not responded in {init_timeout} seconds"
+                f"{additional_message}"
+            )
         return ADCM(container, container_ip, port)
 
     # pylint: disable=R0913
