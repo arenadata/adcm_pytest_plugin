@@ -180,6 +180,19 @@ def split_tag(image_name: str):
     return image_repo, image_tag
 
 
+def _wait_for_adcm_container_init(container, container_ip, port, timeout=120):
+    if not wait_for_url(f"http://{container_ip}:{port}/api/v1/", timeout):
+        additional_message = ""
+        try:
+            container.kill()
+        except APIError:
+            additional_message = " \nWARNING: Failed to kill docker container. Try to remove it by hand"
+        raise TimeoutError(
+            f"ADCM API has not responded in {timeout} seconds"
+            f"{additional_message}"
+        )
+
+
 class ADCM:
     """
     Class that wraps ADCM Api operation over self.api (ADCMApiWrapper)
@@ -262,21 +275,8 @@ class DockerWrapper:
             port = "8000"
         else:
             container_ip = ip
-        self._wait_for_container_init(container, container_ip, port)
+        _wait_for_adcm_container_init(container, container_ip, port)
         return ADCM(container, container_ip, port)
-
-    @staticmethod
-    def _wait_for_container_init(container, container_ip, port, timeout=120):
-        if not wait_for_url(f"http://{container_ip}:{port}/api/v1/", timeout):
-            additional_message = ""
-            try:
-                container.kill()
-            except APIError:
-                additional_message = " \nWARNING: Failed to kill docker container. Try to remove it by hand"
-            raise TimeoutError(
-                f"ADCM API has not responded in {timeout} seconds"
-                f"{additional_message}"
-            )
 
     # pylint: disable=R0913
     @allure.step("Run ADCM container from the image {image}:{tag}")
