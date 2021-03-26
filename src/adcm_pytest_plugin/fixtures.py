@@ -106,8 +106,6 @@ def image(request, cmd_opts):
     elif cmd_opts.adcm_image:
         params["adcm_repo"], params["adcm_tag"] = split_tag(cmd_opts.adcm_image)
 
-    init_image = get_initialized_adcm_image(pull=pull, dc=dc, **params)
-
     if not (cmd_opts.dontstop or cmd_opts.staticimage):
 
         def fin():
@@ -123,6 +121,8 @@ def image(request, cmd_opts):
             )
 
         request.addfinalizer(fin)
+
+    init_image = get_initialized_adcm_image(pull=pull, dc=dc, **params)
 
     return init_image["repo"], init_image["tag"]
 
