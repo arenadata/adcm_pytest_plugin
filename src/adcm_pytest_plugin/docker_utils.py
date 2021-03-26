@@ -267,9 +267,7 @@ class DockerWrapper:
 
     @staticmethod
     def _wait_for_container_init(container, container_ip, port, timeout=120):
-        if not wait_for_url(
-            "http://{}:{}/api/v1/".format(container_ip, port), timeout
-        ):
+        if not wait_for_url(f"http://{container_ip}:{port}/api/v1/", timeout):
             additional_message = ""
             try:
                 container.kill()
