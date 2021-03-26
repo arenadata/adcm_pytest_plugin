@@ -293,6 +293,10 @@ class DockerWrapper:
                     detach=True,
                     labels=labels,
                     name=name,
+                    sysctls={
+                        "net.core.somaxconn": "65535",
+                        "net.ipv4.tcp_tw_reuse": "1",
+                    },
                 )
                 break
             except APIError as err:
