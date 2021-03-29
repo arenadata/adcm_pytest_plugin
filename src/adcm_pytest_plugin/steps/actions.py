@@ -53,7 +53,7 @@ def _extract_error_from_ansible_log(log: str):
         task_marker = log.find("******", err_start)
         err_end = log.rfind("\n", 0, task_marker) + 1
         return log[err_start:err_end]
-    return None
+    return ""
 
 
 def _run_action_and_assert_result(
