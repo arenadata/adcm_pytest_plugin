@@ -304,34 +304,17 @@ class DockerWrapper:
         Run ADCM in docker image.
         Return ADCM container and bind port.
         """
-        for _ in range(0, CONTAINER_START_RETRY_COUNT):
-            api_port = "8000/tcp"
-            port_range = "{}-{}".format(MIN_DOCKER_PORT, MAX_DOCKER_PORT)
-            try:
-                container = self.client.containers.run(
-                    "{}:{}".format(image, tag),
-                    ports={api_port: (ip, port_range)},
-                    volumes=volumes,
-                    remove=remove,
-                    detach=True,
-                    labels=labels,
-                    name=name,
-                )
-                port = get_exposed_port(container, api_port)
-                break
-            except APIError as err:
-                if (
-                    "failed: port is already allocated" in err.explanation
-                    or "bind: address already in use" in err.explanation  # noqa: W503
-                ):
-                    # such error excepting leaves created container and there is
-                    # no way to clean it other than from docker library
-                    pass
-                else:
-                    raise err
-        else:
-            raise RetryCountExceeded(
-                f"Unable to start container after {CONTAINER_START_RETRY_COUNT} retries"
-            )
+        api_port = "8000/tcp"
+        port_range = "{}-{}".format(MIN_DOCKER_PORT, MAX_DOCKER_PORT)
+        container = self.client.containers.run(
+            "{}:{}".format(image, tag),
+            ports={api_port: (ip, port_range)},
+            volumes=volumes,
+            remove=remove,
+            detach=True,
+            labels=labels,
+            name=name,
+        )
+        port = get_exposed_port(container, api_port)
         with allure.step(f"ADCM API started on {ip}:{port}/api/v1"):
             return container, port
