@@ -28,7 +28,8 @@ def _get_error_text_from_task_logs(task: Task):
     error_text = ""
     for job in task.job_list():
         for log in job.log_list():
-            error_text += _extract_error_from_ansible_log(log)
+            if log.type == "stdout"
+                error_text += _extract_error_from_ansible_log(log.content)
     return error_text
 
 
