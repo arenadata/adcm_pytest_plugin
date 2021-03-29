@@ -13,9 +13,7 @@
 # pylint: disable=redefined-outer-name, C0103, E0401
 import io
 import os
-import random
 import re
-import socket
 import tarfile
 from contextlib import contextmanager
 from gzip import compress
@@ -24,7 +22,6 @@ import allure
 import docker
 from adcm_client.util.wait import wait_for_url
 from adcm_client.wrappers.api import ADCMApiWrapper
-from deprecated import deprecated
 from docker.errors import APIError, ImageNotFound
 from docker.models.containers import Container
 
@@ -42,24 +39,6 @@ class UnableToBind(Exception):
 
 class RetryCountExceeded(Exception):
     pass
-
-
-@deprecated()
-def _port_is_free(ip, port) -> bool:
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    result = sock.connect_ex((ip, port))
-    if result == 0:
-        return False
-    return True
-
-
-@deprecated()
-def _find_random_port(ip) -> int:
-    for _ in range(0, 20):
-        port = random.randint(MIN_DOCKER_PORT, MAX_DOCKER_PORT)
-        if _port_is_free(ip, port):
-            return port
-    raise UnableToBind("There is no free port for Docker after 20 tries.")
 
 
 def is_docker() -> bool:
