@@ -13,19 +13,20 @@
 # pylint: disable=redefined-outer-name, C0103, E0401
 import io
 import os
-import re
 import random
+import re
 import socket
+import tarfile
 from contextlib import contextmanager
 from gzip import compress
 
 import allure
 import docker
-import tarfile
-
-from docker.errors import APIError, ImageNotFound
 from adcm_client.util.wait import wait_for_url
 from adcm_client.wrappers.api import ADCMApiWrapper
+from deprecated import deprecated
+from docker.errors import APIError, ImageNotFound
+from docker.models.containers import Container
 
 from .utils import random_string
 
@@ -43,6 +44,7 @@ class RetryCountExceeded(Exception):
     pass
 
 
+@deprecated()
 def _port_is_free(ip, port) -> bool:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     result = sock.connect_ex((ip, port))
@@ -51,6 +53,7 @@ def _port_is_free(ip, port) -> bool:
     return True
 
 
+@deprecated()
 def _find_random_port(ip) -> int:
     for _ in range(0, 20):
         port = random.randint(MIN_DOCKER_PORT, MAX_DOCKER_PORT)
@@ -194,6 +197,12 @@ def _wait_for_adcm_container_init(container, container_ip, port, timeout=120):
         )
 
 
+def get_exposed_port(container: Container, container_port: str):
+    """Find exposed port"""
+    container.reload()  # Update cached attrs
+    return container.ports[container_port][0]["HostPort"]
+
+
 class ADCM:
     """
     Class that wraps ADCM Api operation over self.api (ADCMApiWrapper)
@@ -296,17 +305,19 @@ class DockerWrapper:
         Return ADCM container and bind port.
         """
         for _ in range(0, CONTAINER_START_RETRY_COUNT):
-            port = _find_random_port(ip)
+            api_port = "8000/tcp"
+            port_range = "{}-{}".format(MIN_DOCKER_PORT, MAX_DOCKER_PORT)
             try:
                 container = self.client.containers.run(
                     "{}:{}".format(image, tag),
-                    ports={"8000": (ip, port)},
+                    ports={api_port: (ip, port_range)},
                     volumes=volumes,
                     remove=remove,
                     detach=True,
                     labels=labels,
                     name=name,
                 )
+                port = get_exposed_port(container, api_port)
                 break
             except APIError as err:
                 if (
