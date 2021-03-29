@@ -24,20 +24,72 @@ from adcm_client.objects import Cluster, Service, Host, Task, Component
 from .asserts import assert_action_result
 
 
+def _get_error_text_from_task_logs(task: Task):
+    error_text = ""
+    for job in task.job_list():
+        for log in job.log_list():
+            error_text += _extract_error_from_ansible_log(log)
+    return error_text
+
+
+def _extract_error_from_ansible_log(log: str):
+    """
+    Extract ansible error message from ansible log
+
+    >>> _extract_error_from_ansible_log("fatal: Some ERROR\\nTASK [api : something] **********")
+    'fatal: Some ERROR\\n'
+    >>> _extract_error_from_ansible_log(
+    ...     "TASK [api : something] **********\\nok: [adcm-cluster-adb-gw0-e330benhwqir]\\n msg: All assertions passed"
+    ... )
+
+    >>> _extract_error_from_ansible_log(
+    ...     "TASK [conf]**********\\nfatal: Some \\n multiline\\nERROR\\nNO MORE HOSTS LEFT *********"
+    ... )
+    'fatal: Some \\n multiline\\nERROR\\n'
+    """
+    err_start = log.find("fatal:")
+    if err_start > -1:
+        task_marker = log.find("******", err_start)
+        err_end = log.rfind("\n", 0, task_marker) + 1
+        return log[err_start:err_end]
+    return None
+
+
+def _run_action_and_assert_result(
+    obj: Union[Cluster, Service, Host, Component],
+    action_name: str,
+    expected_status="success",
+    **kwargs,
+):
+    """
+    Run action and assert that status equals to 'status' argument
+    """
+    obj_name = obj.name if not isinstance(obj, Host) else obj.fqdn
+    with allure.step(
+        f"Perform action '{action_name}' for {obj.__class__.__name__} '{obj_name}'"
+    ), _suggest_action_if_not_exists(obj, action_name):
+        task = obj.action(name=action_name).run(**kwargs)
+        result = task.wait()
+        ansible_error = ""
+        if result != expected_status and expected_status == "success":
+            ansible_error = _get_error_text_from_task_logs(task)
+        assert_action_result(
+            name=action_name,
+            result=result,
+            status=expected_status,
+            additional_message=ansible_error,
+        )
+
+
 def run_cluster_action_and_assert_result(
     cluster: Cluster, action: str, status="success", **kwargs
 ):
     """
     Run cluster action and assert that status equals to 'status' argument
     """
-    with allure.step(
-        f"Perform action '{action}' for cluster '{cluster.name}'"
-    ), _suggest_action_if_not_exists(cluster, action):
-        assert_action_result(
-            name=action,
-            result=cluster.action(name=action).run(**kwargs).wait(),
-            status=status,
-        )
+    _run_action_and_assert_result(
+        obj=cluster, action_name=action, expected_status=status, **kwargs
+    )
 
 
 def run_service_action_and_assert_result(
@@ -46,14 +98,9 @@ def run_service_action_and_assert_result(
     """
     Run service action and assert that status equals to 'status' argument
     """
-    with allure.step(
-        f"Perform action '{action}' for service '{service.name}'"
-    ), _suggest_action_if_not_exists(service, action):
-        assert_action_result(
-            name=action,
-            result=service.action(name=action).run(**kwargs).wait(),
-            status=status,
-        )
+    _run_action_and_assert_result(
+        obj=service, action_name=action, expected_status=status, **kwargs
+    )
 
 
 def run_component_action_and_assert_result(
@@ -62,14 +109,9 @@ def run_component_action_and_assert_result(
     """
     Run component action and assert that status equals to 'status' argument
     """
-    with allure.step(
-        f"Perform action '{action}' for component '{component.name}'"
-    ), _suggest_action_if_not_exists(component, action):
-        assert_action_result(
-            name=action,
-            result=component.action(name=action).run(**kwargs).wait(),
-            status=status,
-        )
+    _run_action_and_assert_result(
+        obj=component, action_name=action, expected_status=status, **kwargs
+    )
 
 
 def run_host_action_and_assert_result(
@@ -78,14 +120,9 @@ def run_host_action_and_assert_result(
     """
     Run host action and assert that status equals to 'status' argument
     """
-    with allure.step(
-        f"Perform action '{action}' for host '{host.fqdn}'"
-    ), _suggest_action_if_not_exists(host, action):
-        assert_action_result(
-            name=action,
-            result=host.action(name=action).run(**kwargs).wait(),
-            status=status,
-        )
+    _run_action_and_assert_result(
+        obj=host, action_name=action, expected_status=status, **kwargs
+    )
 
 
 @contextmanager
