@@ -33,14 +33,6 @@ DEFAULT_IP = "127.0.0.1"
 CONTAINER_START_RETRY_COUNT = 20
 
 
-class UnableToBind(Exception):
-    pass
-
-
-class RetryCountExceeded(Exception):
-    pass
-
-
 def is_docker() -> bool:
     """
     Look into cgroup to detect if we are in container
