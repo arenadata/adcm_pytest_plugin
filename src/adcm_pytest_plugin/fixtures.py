@@ -167,17 +167,25 @@ def _adcm(image, cmd_opts, request) -> ADCM:
                 pass
             if gather:
                 with allure.step("Gather /adcm/data/ from ADCM container"):
-                    reporter = _allure_reporter(request.config)
-                    test_result = reporter.get_test(uuid=None)
                     file_name = f"ADCM Log {request.node.name}_{time.time()}"
-                    with gather_adcm_data_from_container(adcm) as data:
-                        reporter.attach_data(
-                            uuid=uuid4(),
-                            body=data,
-                            name="{}.tgz".format(file_name),
-                            extension="tgz",
-                            parent_uuid=test_result.uuid,
-                        )
+                    reporter = _allure_reporter(request.config)
+                    if reporter:
+                        test_result = reporter.get_test(uuid=None)
+                        with gather_adcm_data_from_container(adcm) as data:
+                            reporter.attach_data(
+                                uuid=uuid4(),
+                                body=data,
+                                name="{}.tgz".format(file_name),
+                                extension="tgz",
+                                parent_uuid=test_result.uuid,
+                            )
+                    else:
+                        with gather_adcm_data_from_container(adcm) as data:
+                            allure.attach(
+                                body=data,
+                                name="{}.tgz".format(file_name),
+                                extension="tgz",
+                            )
 
             _remove_hosts(adcm)
 
