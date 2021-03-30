@@ -27,9 +27,13 @@ from .asserts import assert_action_result
 def _get_error_text_from_task_logs(task: Task):
     error_text = ""
     for job in task.job_list():
-        for log in job.log_list():
-            if log.type == "stdout":
-                error_text += _extract_error_from_ansible_log(log.content)
+        try:
+            for log in job.log_list():
+                if log.type == "stdout":
+                    error_text += _extract_error_from_ansible_log(log.content)
+        except ObjectNotFound:
+            # Multijobs has no logs for parent Job
+            pass
     return error_text
 
 
