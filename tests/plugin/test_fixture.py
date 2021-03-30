@@ -19,38 +19,16 @@ import allure
 import docker
 
 from requests.exceptions import ReadTimeout as DockerReadTimeout
+from tests.plugin.common import run_tests
 
 pytestmark = [allure.suite("Plugin fixtures")]
-
-
-def _run_tests(
-    testdir, filename: str = None, py_file: str = None, additional_opts: list = None
-):
-    """
-    Run tests with pytest parameters from .py file or multiline string
-    :param testdir:
-    :param filename: name of file from directory "_test_files" which will be running
-    :param py_file: multiline string for makepyfile method which will be running if param 'filename' is None
-    :param additional_opts: list of additional pytest launch parameters
-    """
-    if additional_opts is None:
-        additional_opts = []
-    if filename:
-        testdir.copy_example(filename)
-    elif py_file:
-        testdir.makepyfile(py_file)
-
-    opts = ["-s", "-v", *additional_opts]
-    result = testdir.runpytest(*opts)
-    result.assert_outcomes(passed=1)
-    return result
 
 
 def test_fixture_image(testdir):
     """
     Test image creating by fixture from plugin
     """
-    result = _run_tests(testdir, "test_image.py")
+    result = run_tests(testdir, "test_image.py")
 
     # Asserts fixture teardown
     repo_with_tag = ""
@@ -67,7 +45,7 @@ def test_fixture_adcm(testdir):
     """
     Test ADCM running by fixture from plugin
     """
-    result = _run_tests(testdir, "test_adcm.py")
+    result = run_tests(testdir, "test_adcm.py")
 
     # Asserts fixture teardown
     repo_with_tag = ""
@@ -89,7 +67,7 @@ def test_fixture_sdk_client(testdir):
     """
     Test creating SDKClient object creating by fixture from plugin
     """
-    _run_tests(testdir, "test_sdk_client.py")
+    run_tests(testdir, "test_sdk_client.py")
 
 
 def test_fixture_image_staticimage(testdir):
@@ -103,7 +81,7 @@ def test_fixture_image_staticimage(testdir):
         # For teardown testing. This is needed to transfer result of executing fixture to outside.
         print((repo_name, tag))
     """
-    _run_tests(
+    run_tests(
         testdir,
         py_file=create_image_py_file,
         additional_opts=[f"--staticimage={custom_image_name}"],
@@ -134,7 +112,7 @@ def test_fixture_adcm_dontstop(testdir):
         # For teardown testing. This is needed to transfer result of executing fixture to outside.
         print((repo_name, tag))
     """
-    result = _run_tests(
+    result = run_tests(
         testdir, py_file=run_adcm_py_file, additional_opts=["--dontstop"]
     )
     repo_with_tag = ""
