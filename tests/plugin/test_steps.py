@@ -23,10 +23,11 @@ from adcm_pytest_plugin.utils import get_data_dir
 pytestmark = [allure.suite("Plugin steps")]
 
 
-def test_fail_action(sdk_client_fs):
+@pytest.mark.parametrize("bundle_dir", ["fail_action_cluster", "fail_multijob_cluster"])
+def test_fail_action(sdk_client_fs, bundle_dir):
     """Run fail action and assert result"""
-    bundle_dir = get_data_dir(__file__, "fail_action_cluster")
-    bundle = sdk_client_fs.upload_from_fs(bundle_dir)
+    bundle_dir_full = get_data_dir(__file__, bundle_dir)
+    bundle = sdk_client_fs.upload_from_fs(bundle_dir_full)
     cluster = bundle.cluster_create("test_cluster")
     with pytest.raises(AssertionError) as action_run_exception:
         run_cluster_action_and_assert_result(cluster=cluster, action="fail_action")
