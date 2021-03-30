@@ -28,7 +28,8 @@ def _get_error_text_from_task_logs(task: Task):
     error_text = ""
     for job in task.job_list():
         for log in job.log_list():
-            error_text += _extract_error_from_ansible_log(log)
+            if log.type == "stdout":
+                error_text += _extract_error_from_ansible_log(log.content)
     return error_text
 
 
@@ -41,7 +42,7 @@ def _extract_error_from_ansible_log(log: str):
     >>> _extract_error_from_ansible_log(
     ...     "TASK [api : something] **********\\nok: [adcm-cluster-adb-gw0-e330benhwqir]\\n msg: All assertions passed"
     ... )
-
+    ''
     >>> _extract_error_from_ansible_log(
     ...     "TASK [conf]**********\\nfatal: Some \\n multiline\\nERROR\\nNO MORE HOSTS LEFT *********"
     ... )
@@ -52,7 +53,7 @@ def _extract_error_from_ansible_log(log: str):
         task_marker = log.find("******", err_start)
         err_end = log.rfind("\n", 0, task_marker) + 1
         return log[err_start:err_end]
-    return None
+    return ""
 
 
 def _run_action_and_assert_result(
