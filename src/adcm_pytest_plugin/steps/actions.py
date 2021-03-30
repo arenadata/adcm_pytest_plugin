@@ -42,7 +42,7 @@ def _extract_error_from_ansible_log(log: str):
     >>> _extract_error_from_ansible_log(
     ...     "TASK [api : something] **********\\nok: [adcm-cluster-adb-gw0-e330benhwqir]\\n msg: All assertions passed"
     ... )
-
+    ''
     >>> _extract_error_from_ansible_log(
     ...     "TASK [conf]**********\\nfatal: Some \\n multiline\\nERROR\\nNO MORE HOSTS LEFT *********"
     ... )
