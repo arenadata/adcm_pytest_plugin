@@ -1,15 +1,12 @@
 """Common methods for plugin tests"""
 
-import os
-
 
 def run_tests(
     testdir,
     filename: str = None,
     py_file: str = None,
     additional_opts: list = None,
-    additioanal_files: list = None,
-    outcomes=None
+    outcomes=None,
 ):
     """
     Run tests with pytest parameters from .py file or multiline string
@@ -23,9 +20,6 @@ def run_tests(
         additional_opts = []
     if filename:
         testdir.copy_example(filename)
-        if additioanal_files:
-            for file in additioanal_files:
-                testdir.copy_example(file)
     elif py_file:
         testdir.makepyfile(py_file)
 
