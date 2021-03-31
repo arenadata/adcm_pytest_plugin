@@ -19,7 +19,7 @@ from typing import Union
 
 import allure
 from adcm_client.base import ObjectNotFound
-from adcm_client.objects import Cluster, Service, Host, Task, Component
+from adcm_client.objects import Cluster, Service, Host, Task, Component, Provider
 
 from .asserts import assert_action_result
 
@@ -61,7 +61,7 @@ def _extract_error_from_ansible_log(log: str):
 
 
 def _run_action_and_assert_result(
-    obj: Union[Cluster, Service, Host, Component],
+    obj: Union[Cluster, Service, Host, Component, Provider],
     action_name: str,
     expected_status="success",
     **kwargs,
@@ -127,6 +127,17 @@ def run_host_action_and_assert_result(
     """
     _run_action_and_assert_result(
         obj=host, action_name=action, expected_status=status, **kwargs
+    )
+
+
+def run_provider_action_and_assert_result(
+    provider: Provider, action: str, status="success", **kwargs
+):
+    """
+    Run provider action and assert that status equals to 'status' argument
+    """
+    _run_action_and_assert_result(
+        obj=provider, action_name=action, expected_status=status, **kwargs
     )
 
 
