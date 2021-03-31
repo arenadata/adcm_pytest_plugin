@@ -34,6 +34,7 @@ def _get_error_text_from_task_logs(task: Task):
                     error_text += _extract_error_from_ansible_log(log.content)
         except ErrorMessage as log_exception:
             # Multijobs has no logs for parent Job
+            # pylint: disable=protected-access
             if log_exception.error._data["code"] == "LOG_NOT_FOUND":
                 pass
             else:
