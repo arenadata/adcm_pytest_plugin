@@ -17,13 +17,13 @@
     fail_action:
       type: task
       scripts:
-        - name: pass
-          display_name: Pass
-          script_type: ansible
-          script: pass_action.yaml
         - name: fail
           display_name: Fail
           script_type: ansible
           script: fail_action.yaml
+        - name: pass
+          display_name: Pass
+          script_type: ansible
+          script: pass_action.yaml
       states:
         available: any

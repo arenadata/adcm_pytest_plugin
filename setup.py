@@ -18,7 +18,7 @@ setup(
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     include_package_data=True,
-    version="3.3.4",
+    version="3.3.5",
     # the following makes a plugin available to pytest
     entry_points={"pytest11": ["adcm_pytest_plugin = adcm_pytest_plugin.plugin"]},
     # custom PyPI classifier for pytest plugins
@@ -32,6 +32,7 @@ setup(
         "ifaddr",
         "retry",
         "deprecated",
+        "coreapi",
     ],
     classifiers=["Framework :: Pytest"],
 )
