@@ -24,6 +24,7 @@ def assert_state(obj: BaseAPIObject, state):
     Asserts object state to be equal to 'state' argument
 
     >>> some_obj = lambda: None
+    >>> some_obj.reread = lambda: None
     >>> some_obj.state = "installed"
     >>> assert_state(some_obj, "installed") is None
     True
@@ -32,13 +33,18 @@ def assert_state(obj: BaseAPIObject, state):
     ...
     AssertionError:
     """
-    try:
+    obj.reread()
+    if hasattr(obj, "name"):
         name = obj.name
-    except AttributeError:
-        name = obj.__repr__
-    with allure.step(f"Assert state of '{name}' to be equal to '{state}'"):
+    elif hasattr(obj, "fqdn"):
+        name = obj.fqdn
+    else:
+        name = obj.__repr__()
+    with allure.step(
+        f"Assert state of {obj.__class__.__name__} '{name}' to be equal to '{state}'"
+    ):
         assert obj.state == state, (
-            f"Object '{name}' have unexpected status - '{obj.state}'. "
+            f"Object '{name}' have unexpected state - '{obj.state}'. "
             f"Expected - '{state}'"
         )
 
