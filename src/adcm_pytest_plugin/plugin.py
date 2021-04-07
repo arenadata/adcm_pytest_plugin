@@ -99,7 +99,7 @@ def pytest_addoption(parser):
         help="This option will ignore remote-executor-host option "
         "and attach ADCM Api to docker host by default. "
         "This option is used to start ADCM instances on the remote host. "
-        "Docker daemon should be running and be available with provided host:port "
+        "Docker daemon should be running and be available with provided ip:port "
         "Ex: '192.168.1.1:2375'",
     )
 
