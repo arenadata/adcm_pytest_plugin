@@ -142,7 +142,7 @@ def init_adcm(repo, tag, adcm_repo, adcm_tag, pull, dc=None):
     dw = DockerWrapper(dc=dc)
     # Check if we use remote dockerd
     if dc and "localhost" not in dc.api.base_url:
-        base_url = dc.api.base_url
+        base_url = dc.api.base_url # http+docker://localhost
         ip_start = base_url.rfind("/") + 1
         ip_end = base_url.rfind(":")
         ip = base_url[ip_start:ip_end]
