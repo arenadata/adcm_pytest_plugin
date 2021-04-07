@@ -143,7 +143,9 @@ def init_adcm(repo, tag, adcm_repo, adcm_tag, pull, dc=None):
     # Check if we use remote dockerd
     if dc and "localhost" not in dc.api.base_url:
         base_url = dc.api.base_url
-        ip = base_url[base_url.rfind("/") + 1 : base_url.rfind(":")]
+        ip_start = base_url.rfind("/") + 1
+        ip_end = base_url.rfind(":")
+        ip = base_url[ip_start:ip_end]
     else:
         ip = None
     adcm = dw.run_adcm(image=adcm_repo, tag=adcm_tag, remove=False, pull=pull, ip=ip)
