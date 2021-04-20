@@ -118,8 +118,12 @@ def image(request, cmd_opts):
                         # https://github.com/docker/docker-py/issues/1966 workaround
                         pass
                 retry_call(
-                    dc.images.remove, fargs=[image_name], fkwargs={"force": True}, tries=5
+                    dc.images.remove,
+                    fargs=[image_name],
+                    fkwargs={"force": True},
+                    tries=5,
                 )
+
         # Set None for init image to avoid errors in finalizer
         # when get_initialized_adcm_image() fails
         init_image = None
