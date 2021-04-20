@@ -109,17 +109,24 @@ def image(request, cmd_opts):
     if not (cmd_opts.dontstop or cmd_opts.staticimage):
 
         def fin():
-            image_name = "{}:{}".format(*init_image.values())
-            for container in dc.containers.list(filters=dict(ancestor=image_name)):
-                try:
-                    container.wait(condition="removed", timeout=30)
-                except ConnectionError:
-                    # https://github.com/docker/docker-py/issues/1966 workaround
-                    pass
-            retry_call(
-                dc.images.remove, fargs=[image_name], fkwargs={"force": True}, tries=5
-            )
+            if init_image:
+                image_name = "{}:{}".format(*init_image.values())
+                for container in dc.containers.list(filters=dict(ancestor=image_name)):
+                    try:
+                        container.wait(condition="removed", timeout=30)
+                    except ConnectionError:
+                        # https://github.com/docker/docker-py/issues/1966 workaround
+                        pass
+                retry_call(
+                    dc.images.remove,
+                    fargs=[image_name],
+                    fkwargs={"force": True},
+                    tries=5,
+                )
 
+        # Set None for init image to avoid errors in finalizer
+        # when get_initialized_adcm_image() fails
+        init_image = None
         request.addfinalizer(fin)
 
     init_image = get_initialized_adcm_image(pull=pull, dc=dc, **params)
