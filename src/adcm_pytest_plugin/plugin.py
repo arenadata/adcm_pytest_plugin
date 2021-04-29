@@ -11,6 +11,7 @@
 # limitations under the License.
 
 # pylint: disable=W0611, W0401, W0614
+import os
 from argparse import Namespace
 
 import pytest
@@ -160,4 +161,14 @@ def pytest_runtest_makereport(item, call):
     # set a report attribute for each phase of a call, which can
     # be "setup", "call", "teardown"
 
+    os.environ["rep_" + rep.when + "_passed"] = str(rep.passed)
     setattr(item, "rep_" + rep.when, rep)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """
+    Clear custom env variables at the end of all tests
+    """
+    for var in dict(os.environ):
+        if "rep_" in var:
+            del os.environ[var]
