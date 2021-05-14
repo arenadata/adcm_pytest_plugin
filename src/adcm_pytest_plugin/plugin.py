@@ -15,7 +15,6 @@ import os
 from argparse import Namespace
 
 import pytest
-import requests
 from _pytest.config import Config
 from version_utils import rpm
 
@@ -27,23 +26,23 @@ options: Namespace = Namespace()
 
 # list of ADCM release tags
 ADCM_TAGS = [
-    '2021031007',
-    '2021030114',
-    '2021021506',
-    '2020121615',
-    '2020081011',
-    '2020070611',
-    '2020062514',
-    '2020031118',
-    '2020051315',
-    '2020051222',
-    '2020022014',
-    '2020013015',
-    '2020013010',
-    '2019121623',
-    '2019112016',
-    '2019101518',
-    '2019100815',
+    "2021031007",
+    "2021030114",
+    "2021021506",
+    "2020121615",
+    "2020081011",
+    "2020070611",
+    "2020062514",
+    "2020031118",
+    "2020051315",
+    "2020051222",
+    "2020022014",
+    "2020013015",
+    "2020013010",
+    "2019121623",
+    "2019112016",
+    "2019101518",
+    "2019100815",
 ]
 
 
@@ -153,7 +152,9 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize("image", params, indirect=True, ids=ids)
 
 
-def parametrized_by_adcm_version(adcm_min_version=None, adcm_images=None, repo="arenadata/adcm"):
+def parametrized_by_adcm_version(
+    adcm_min_version=None, adcm_images=None, repo="arenadata/adcm"
+):
     params = None
     ids = None
     if adcm_min_version:
