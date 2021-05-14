@@ -24,6 +24,28 @@ from .docker_utils import split_tag
 options: Namespace = Namespace()
 
 
+# list of ADCM release tags
+ADCM_TAGS = [
+    '2021031007',
+    '2021030114',
+    '2021021506',
+    '2020121615',
+    '2020081011',
+    '2020070611',
+    '2020062514',
+    '2020031118',
+    '2020051315',
+    '2020051222',
+    '2020022014',
+    '2020013015',
+    '2020013010',
+    '2019121623',
+    '2019112016',
+    '2019101518',
+    '2019100815',
+]
+
+
 def pytest_configure(config: Config):
     """Set global options to plugin property to access to all pytest options outside of fixtures
 
@@ -134,17 +156,12 @@ def parametrized_by_adcm_version(adcm_min_version=None, adcm_images=None):
 
 
 def _get_adcm_new_versions_tags(min_ver):
-    response = requests.get(
-        "https://hub.docker.com/v2/repositories/arenadata/adcm/tags/?page_size=100"
-    )
-    for data in response.json()["results"]:
-        tag = data.get("name")  # get tag
-        if tag.isdigit():  # filter latest tag
-            # convert to version format
-            version = "%s.%s.%s.%s" % (tag[:4], tag[4:6], tag[6:8], tag[8:10])
-            # filter older versions
-            if rpm.compare_versions(version, min_ver[:13]) != -1:
-                yield version.replace(".", "")
+    for tag in ADCM_TAGS:
+        # convert to version format
+        version = "%s.%s.%s.%s" % (tag[:4], tag[4:6], tag[6:8], tag[8:10])
+        # filter older versions
+        if rpm.compare_versions(version, min_ver[:13]) != -1:
+            yield version.replace(".", "")
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
