@@ -139,7 +139,9 @@ def _get_adcm_new_versions_tags(min_ver):
     tags = requests.get("https://hub.arenadata.io/v2/adcm/adcm/tags/list").json()[
         "tags"
     ]
-    for tag in set(tags):
+    tags = list(set(tags))  # remove possible duplicates
+    tags.sort()  # sort to ensure same order for all xdist workers
+    for tag in tags:
         if tag.isdigit():
             # convert to version format
             version = "%s.%s.%s.%s" % (tag[:4], tag[4:6], tag[6:8], tag[8:10])
