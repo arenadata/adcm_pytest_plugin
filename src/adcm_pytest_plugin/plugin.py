@@ -136,25 +136,16 @@ def parametrized_by_adcm_version(
     return params, ids
 
 
-def _get_artifacts(page_size, page_number):
-    return requests.get(
-        "https://hub.arenadata.io/api/v2.0/projects/adcm/repositories/adcm/artifacts/"
-        f"?page_size={page_size}&page={page_number}"
-    ).json()
-
-
 def _get_adcm_new_versions_tags(min_ver):
-    page_number = 1
-    tags = []
-    while artifacts_page := _get_artifacts(page_size=100, page_number=page_number):
-        for artifact in artifacts_page:
-            tags.extend([tag['name'] for tag in artifact["tags"] if tag["name"].isdigit()])
+
+    tags = requests.get("https://hub.arenadata.io/v2/adcm/adcm/tags/list").json()["tags"]
     for tag in set(tags):
-        # convert to version format
-        version = "%s.%s.%s.%s" % (tag[:4], tag[4:6], tag[6:8], tag[8:10])
-        # filter older versions
-        if rpm.compare_versions(version, min_ver[:13]) != -1:
-            yield version.replace(".", "")
+        if tag.isdigit():
+            # convert to version format
+            version = "%s.%s.%s.%s" % (tag[:4], tag[4:6], tag[6:8], tag[8:10])
+            # filter older versions
+            if rpm.compare_versions(version, min_ver[:13]) != -1:
+                yield version.replace(".", "")
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
