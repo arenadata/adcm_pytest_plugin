@@ -153,7 +153,7 @@ def pytest_generate_tests(metafunc):
 
 
 def parametrized_by_adcm_version(
-    adcm_min_version=None, adcm_images=None, repo="arenadata/adcm"
+    adcm_min_version=None, adcm_images=None, repo="hub.arenadata.io/adcm/adcm"
 ):
     params = None
     ids = None

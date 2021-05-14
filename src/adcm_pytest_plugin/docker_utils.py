@@ -254,7 +254,7 @@ class DockerWrapper:
         If tag is None or is not present than a tag 'latest' will be used
         """
         if image is None:
-            image = "arenadata/adcm"
+            image = "hub.arenadata.io/adcm/adcm"
         if tag is None:
             tag = "latest"
         if pull:
