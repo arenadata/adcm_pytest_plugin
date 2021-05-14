@@ -121,9 +121,7 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize("image", params, indirect=True, ids=ids)
 
 
-def parametrized_by_adcm_version(
-    adcm_min_version=None, adcm_images=None
-):
+def parametrized_by_adcm_version(adcm_min_version=None, adcm_images=None):
     params = None
     ids = None
     if adcm_min_version:
@@ -138,7 +136,9 @@ def parametrized_by_adcm_version(
 
 def _get_adcm_new_versions_tags(min_ver):
 
-    tags = requests.get("https://hub.arenadata.io/v2/adcm/adcm/tags/list").json()["tags"]
+    tags = requests.get("https://hub.arenadata.io/v2/adcm/adcm/tags/list").json()[
+        "tags"
+    ]
     for tag in set(tags):
         if tag.isdigit():
             # convert to version format
