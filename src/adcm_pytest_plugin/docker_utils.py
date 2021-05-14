@@ -108,8 +108,8 @@ def get_file_from_container(instance, path, filename):
     for i in stream:
         file_obj.write(i)
     file_obj.seek(0)
-    tar = tarfile.open(mode="r", fileobj=file_obj)
-    return tar.extractfile(filename)
+    with tarfile.open(mode="r", fileobj=file_obj) as tar:
+        return tar.extractfile(filename)
 
 
 @allure.step("Prepare initialized ADCM image")
