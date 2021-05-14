@@ -91,9 +91,18 @@ def pytest_addoption(parser):
         "--adcm-min-version",
         action="store",
         default=None,
-        help="In this mode test will run on all images from arenadata/adcm"
+        help="In this mode test will run on all ADCM release images "
         " that are newer that min version. "
         "Argument format 2020.01.30.15-c4c8b2a or 2020.01.30.15",
+    )
+
+    parser.addoption(
+        "--adcm-repo",
+        action="store",
+        default="hub.arenadata.io/adcm/adcm",
+        help="Name of repo to get ADCM images from "
+        " when --adcm-min-version is used "
+        "Argument format hub.arenadata.io/adcm/adcm or arenadata/adcm",
     )
 
     parser.addoption(
@@ -134,19 +143,19 @@ def pytest_generate_tests(metafunc):
     """
     adcm_min_version = metafunc.config.getoption("adcm_min_version")
     adcm_images = metafunc.config.getoption("adcm_images")
+    adcm_repo = metafunc.config.getoption("adcm_repo")
 
     params, ids = parametrized_by_adcm_version(
-        adcm_min_version=adcm_min_version, adcm_images=adcm_images
+        adcm_min_version=adcm_min_version, adcm_images=adcm_images, repo=adcm_repo
     )
     if params:
         metafunc.parametrize("image", params, indirect=True, ids=ids)
 
 
-def parametrized_by_adcm_version(adcm_min_version=None, adcm_images=None):
+def parametrized_by_adcm_version(adcm_min_version=None, adcm_images=None, repo="arenadata/adcm"):
     params = None
     ids = None
     if adcm_min_version:
-        repo = "arenadata/adcm"
         params = [[repo, tag] for tag in _get_adcm_new_versions_tags(adcm_min_version)]
         ids = list(map(lambda x: x[1] if x[1] is not None else "latest", params))
     elif adcm_images:
