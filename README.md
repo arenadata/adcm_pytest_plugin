@@ -168,7 +168,6 @@ List of available options:
     - [`--adcm-image`](#--adcm-image)
     - [`--adcm-images`](#--adcm-images)
     - [`--adcm-min-version`](#--adcm-min-version)
-    - [`--adcm-repo`](#--adcm-repo)
     - [`--nopull`](#--nopull)
 - Misc
     - [`--remote-executor-host`](#--remote-executor-host)
@@ -233,17 +232,6 @@ Property | Value
 value | `string of ADCM version format`
 default | `none`
 example | `--adcm-min-version 2020.01.30.15`
-
-#### `--adcm-repo`
-
-> Name of repo to get ADCM images from 
-> when [`--adcm-min-version`](#--adcm-min-version) is used
-
-Property | Value
----: | ---
-value | `string with docker repo name`
-default | `hub.arenadata.io/adcm/adcm`
-example | `--adcm-repo my.private.registry/adcm`
 
 #### `--nopull`
 

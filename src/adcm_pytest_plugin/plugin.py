@@ -15,6 +15,7 @@ import os
 from argparse import Namespace
 
 import pytest
+import requests
 from _pytest.config import Config
 from version_utils import rpm
 
@@ -22,28 +23,6 @@ from .fixtures import *  # noqa: F401, F403
 from .docker_utils import split_tag
 
 options: Namespace = Namespace()
-
-
-# list of ADCM release tags
-ADCM_TAGS = [
-    "2021031007",
-    "2021030114",
-    "2021021506",
-    "2020121615",
-    "2020081011",
-    "2020070611",
-    "2020062514",
-    "2020031118",
-    "2020051315",
-    "2020051222",
-    "2020022014",
-    "2020013015",
-    "2020013010",
-    "2019121623",
-    "2019112016",
-    "2019101518",
-    "2019100815",
-]
 
 
 def pytest_configure(config: Config):
@@ -97,15 +76,6 @@ def pytest_addoption(parser):
     )
 
     parser.addoption(
-        "--adcm-repo",
-        action="store",
-        default="hub.arenadata.io/adcm/adcm",
-        help="Name of repo to get ADCM images from "
-        " when --adcm-min-version is used "
-        "Argument format hub.arenadata.io/adcm/adcm or arenadata/adcm",
-    )
-
-    parser.addoption(
         "--adcm-images", nargs="+", help="List of images where to run tests"
     )
 
@@ -143,21 +113,21 @@ def pytest_generate_tests(metafunc):
     """
     adcm_min_version = metafunc.config.getoption("adcm_min_version")
     adcm_images = metafunc.config.getoption("adcm_images")
-    adcm_repo = metafunc.config.getoption("adcm_repo")
 
     params, ids = parametrized_by_adcm_version(
-        adcm_min_version=adcm_min_version, adcm_images=adcm_images, repo=adcm_repo
+        adcm_min_version=adcm_min_version, adcm_images=adcm_images
     )
     if params:
         metafunc.parametrize("image", params, indirect=True, ids=ids)
 
 
 def parametrized_by_adcm_version(
-    adcm_min_version=None, adcm_images=None, repo="hub.arenadata.io/adcm/adcm"
+    adcm_min_version=None, adcm_images=None
 ):
     params = None
     ids = None
     if adcm_min_version:
+        repo = "hub.arenadata.io/adcm/adcm"
         params = [[repo, tag] for tag in _get_adcm_new_versions_tags(adcm_min_version)]
         ids = list(map(lambda x: x[1] if x[1] is not None else "latest", params))
     elif adcm_images:
@@ -166,8 +136,20 @@ def parametrized_by_adcm_version(
     return params, ids
 
 
+def _get_artifacts(page_size, page_number):
+    return requests.get(
+        "https://hub.arenadata.io/api/v2.0/projects/adcm/repositories/adcm/artifacts/"
+        f"?page_size={page_size}&page={page_number}"
+    ).json()
+
+
 def _get_adcm_new_versions_tags(min_ver):
-    for tag in ADCM_TAGS:
+    page_number = 1
+    tags = []
+    while artifacts_page := _get_artifacts(page_size=100, page_number=page_number):
+        for artifact in artifacts_page:
+            tags.extend([tag['name'] for tag in artifact["tags"] if tag["name"].isdigit()])
+    for tag in set(tags):
         # convert to version format
         version = "%s.%s.%s.%s" % (tag[:4], tag[4:6], tag[6:8], tag[8:10])
         # filter older versions
