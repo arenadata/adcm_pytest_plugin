@@ -70,7 +70,7 @@ def pytest_addoption(parser):
         "--adcm-min-version",
         action="store",
         default=None,
-        help="In this mode test will run on all images from arenadata/adcm"
+        help="In this mode test will run on all ADCM release images "
         " that are newer that min version. "
         "Argument format 2020.01.30.15-c4c8b2a or 2020.01.30.15",
     )
@@ -125,7 +125,7 @@ def parametrized_by_adcm_version(adcm_min_version=None, adcm_images=None):
     params = None
     ids = None
     if adcm_min_version:
-        repo = "arenadata/adcm"
+        repo = "hub.arenadata.io/adcm/adcm"
         params = [[repo, tag] for tag in _get_adcm_new_versions_tags(adcm_min_version)]
         ids = list(map(lambda x: x[1] if x[1] is not None else "latest", params))
     elif adcm_images:
@@ -135,12 +135,15 @@ def parametrized_by_adcm_version(adcm_min_version=None, adcm_images=None):
 
 
 def _get_adcm_new_versions_tags(min_ver):
-    response = requests.get(
-        "https://hub.docker.com/v2/repositories/arenadata/adcm/tags/?page_size=100"
-    )
-    for data in response.json()["results"]:
-        tag = data.get("name")  # get tag
-        if tag.isdigit():  # filter latest tag
+
+    tags = requests.get("https://hub.arenadata.io/v2/adcm/adcm/tags/list").json()[
+        "tags"
+    ]
+    # remove possible duplicates
+    # sort to ensure same order for all xdist workers
+    tags = sorted(list(set(tags)))
+    for tag in tags:
+        if tag.isdigit():
             # convert to version format
             version = "%s.%s.%s.%s" % (tag[:4], tag[4:6], tag[6:8], tag[8:10])
             # filter older versions

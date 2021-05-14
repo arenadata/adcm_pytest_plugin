@@ -189,7 +189,7 @@ example | `--staticimage arenadata/adcm:test or --staticimage some_repo/some_ima
 
 #### `--dontstop`
 
-> If passed ADCM containers will remain running after tests
+> If passed then ADCM containers will remain running after tests
 
 Property | Value
 ---: | ---
@@ -222,8 +222,8 @@ example | `--adcm-images arenadata/adcm:2020.01.30.15 arenadata/adcm:2020.10.15.
 
 #### `--adcm-min-version`
 
-> If passed tests will be executed on all ADCM docker images
-> from arenadata/adcm newer than version passed
+> If passed then tests will be executed on all ADCM release images
+> newer than version passed
 >
 > Incompatible with [`--adcm-images`](#--adcm-images) and [`--adcm-image`](#--adcm-image)
 
@@ -235,7 +235,7 @@ example | `--adcm-min-version 2020.01.30.15`
 
 #### `--nopull`
 
-> If passed no pull action will be performed on `docker run`
+> If passed then no pull action will be performed on `docker run`
 
 Property | Value
 ---: | ---
@@ -246,7 +246,7 @@ default | `false`
 
 #### `--remote-executor-host`
 
-> If passed ADCM API will be initialized with external IP
+> If passed then ADCM API will be initialized with external IP
 > to allow incoming connections from any remote executor (ex. Selenoid)
 > Tests will fail if remote host is unreachable.
 > This option will be ignored if [`--remote-docker`](#--remote-docker) option is passed
@@ -258,7 +258,7 @@ default | `none`
 
 #### `--remote-docker`
 
-> If passed ADCM instances will be created on a remote host.
+> If passed then ADCM instances will be created on a remote host.
 > Docker daemon should be running and be available with provided host:port
 
 
