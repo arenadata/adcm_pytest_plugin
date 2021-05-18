@@ -25,7 +25,7 @@ import tarfile
 
 from docker.errors import APIError, ImageNotFound
 from adcm_client.util.wait import wait_for_url
-from adcm_client.wrappers.api import ADCMApiWrapper
+from adcm_client.objects import ADCMClient
 
 from .utils import random_string
 
@@ -112,51 +112,87 @@ def get_file_from_container(instance, path, filename):
         return tar.extractfile(filename)
 
 
-@allure.step("Prepare initialized ADCM image")
-def get_initialized_adcm_image(
-    repo="local/adcminit",
-    tag=None,
-    adcm_repo=None,
-    adcm_tag=None,
-    pull=True,
-    dc=None,
-) -> dict:
+class ADCMInitializer:
     """
-    We consider that if we know tag, staticimage option is used,
-    container is already initialized. In case if option is used but image is absent
-    we will create an image with such tag for further use.
-    If we don't know tag image must be initialized, tag will be randomly generated.
+    Class for initialized ADCM image preparation.
     """
-    if not dc:
-        dc = docker.from_env(timeout=120)
 
-    if tag and image_exists(repo, tag, dc):
-        return {"repo": repo, "tag": tag}
-    else:
-        if not tag:
-            tag = random_string()
-        return init_adcm(repo, tag, adcm_repo, adcm_tag, pull, dc)
+    __slots__ = (
+        "repo",
+        "tag",
+        "adcm_repo",
+        "adcm_tag",
+        "pull",
+        "dc",
+        "preupload_bundle_urls",
+        "adcm_credentials",
+        "_adcm",
+    )
 
+    def __init__(
+            self,
+            repo="local/adcminit",
+            tag=None,
+            adcm_repo=None,
+            adcm_tag=None,
+            pull=True,
+            dc=None,
+            preupload_bundle_urls=None,
+            adcm_credentials=None,
+    ):
+        self.repo = repo
+        self.tag = tag if tag else random_string()
+        self.adcm_repo = adcm_repo
+        self.adcm_tag = adcm_tag
+        self.pull = pull
+        self.dc = dc if dc else docker.from_env(timeout=120)
+        self.preupload_bundle_urls = preupload_bundle_urls
+        self.adcm_credentials = adcm_credentials if adcm_credentials else {}
+        self._adcm = None
 
-def init_adcm(repo, tag, adcm_repo, adcm_tag, pull, dc=None):
-    dw = DockerWrapper(dc=dc)
-    # Check if we use remote dockerd
-    if dc and "localhost" not in dc.api.base_url:
-        # dc.api.base_url is most likely tcp://{cmd_opts.remote_docker}
-        base_url = dc.api.base_url
-        ip_start = base_url.rfind("/") + 1
-        ip_end = base_url.rfind(":")
-        ip = base_url[ip_start:ip_end]
-    else:
-        # then dc.api.base_url is most likely http+docker://localhost
-        ip = None
-    adcm = dw.run_adcm(image=adcm_repo, tag=adcm_tag, remove=False, pull=pull, ip=ip)
-    # Create a snapshot from initialized container
-    adcm.container.stop()
-    with allure.step(f"Commit initialized ADCM container to image {repo}:{tag}"):
-        adcm.container.commit(repository=repo, tag=tag)
-    adcm.container.remove()
-    return {"repo": repo, "tag": tag}
+    @allure.step("Prepare initialized ADCM image")
+    def get_initialized_adcm_image(self) -> dict:
+        """
+        If image with given 'repo' and 'tag' then it was most likely created with staticimage run,
+        so we just use it.
+        If there is no image with given 'repo' and 'tag' we will create a new one
+        """
+
+        if image_exists(self.repo, self.tag, self.dc):
+            return {"repo": self.repo, "tag": self.tag}
+        else:
+            return self.init_adcm()
+
+    def init_adcm(self):
+        dw = DockerWrapper(dc=self.dc)
+        # Check if we use remote dockerd
+        if self.dc and "localhost" not in self.dc.api.base_url:
+            # dc.api.base_url is most likely tcp://{cmd_opts.remote_docker}
+            base_url = self.dc.api.base_url
+            ip_start = base_url.rfind("/") + 1
+            ip_end = base_url.rfind(":")
+            ip = base_url[ip_start:ip_end]
+        else:
+            # then dc.api.base_url is most likely http+docker://localhost
+            ip = None
+        self._adcm = dw.run_adcm(
+            image=self.adcm_repo, tag=self.adcm_tag, remove=False, pull=self.pull, ip=ip
+        )
+        # Pre-upload bundles to ADCM before image initialization
+        self._preupload_bundles()
+        # Create a snapshot from initialized container
+        self._adcm.container.stop()
+        with allure.step(f"Commit initialized ADCM container to image {self.repo}:{self.tag}"):
+            self._adcm.container.commit(repository=self.repo, tag=self.tag)
+        self._adcm.container.remove()
+        return {"repo": self.repo, "tag": self.tag}
+
+    @allure.step("Pre-upload bundles into ADCM before image initialization")
+    def _preupload_bundles(self):
+        if self.preupload_bundle_urls:
+            adcm_cli = ADCMClient(url=self._adcm.url, **self.adcm_credentials)
+            for url in self.preupload_bundle_urls:
+                adcm_cli.upload_from_url(url=url)
 
 
 def image_exists(repo, tag, dc=None):
@@ -210,14 +246,13 @@ class ADCM:
     and wraps docker over self.container (see docker module for info)
     """
 
-    __slots__ = ("container", "ip", "port", "url", "api")
+    __slots__ = ("container", "ip", "port", "url")
 
     def __init__(self, container, ip, port):
         self.container = container
         self.ip = ip
         self.port = port
         self.url = "http://{}:{}".format(self.ip, self.port)
-        self.api = ADCMApiWrapper(self.url)
 
     def stop(self):
         """Stops container"""

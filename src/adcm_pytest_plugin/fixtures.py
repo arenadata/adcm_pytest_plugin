@@ -11,6 +11,7 @@
 # limitations under the License.
 
 import time
+import warnings
 from typing import Optional
 
 import allure
@@ -33,8 +34,8 @@ from .docker_utils import (
     DockerWrapper,
     is_docker,
     gather_adcm_data_from_container,
-    get_initialized_adcm_image,
     split_tag,
+    ADCMInitializer,
 )
 from .utils import check_mutually_exclusive, remove_host
 
@@ -52,10 +53,17 @@ __all__ = [
 ]
 
 
+@allure.title("ADCM credentials")
+@pytest.fixture(scope="session")
+def adcm_credentials():
+    """ ADCM credentials for use in tests"""
+    return {"user": "admin", "password": "admin"}
+
+
 # pylint: disable=W0621
 @allure.title("ADCM Image")
 @pytest.fixture(scope="session")
-def image(request, cmd_opts):
+def image(request, cmd_opts, adcm_credentials):
     """That fixture creates ADCM container, waits until
     a database becomes initialised and stores that as images
     with random tag and name local/adcminit
@@ -108,7 +116,7 @@ def image(request, cmd_opts):
 
     if not (cmd_opts.dontstop or cmd_opts.staticimage):
 
-        def fin():
+        def finalize():
             if init_image:
                 image_name = "{}:{}".format(*init_image.values())
                 for container in dc.containers.list(filters=dict(ancestor=image_name)):
@@ -127,14 +135,39 @@ def image(request, cmd_opts):
         # Set None for init image to avoid errors in finalizer
         # when get_initialized_adcm_image() fails
         init_image = None
-        request.addfinalizer(fin)
+        request.addfinalizer(finalize)
 
-    init_image = get_initialized_adcm_image(pull=pull, dc=dc, **params)
+    init_image = ADCMInitializer(
+        pull=pull,
+        dc=dc,
+        preupload_bundle_urls=_get_bundle_urls_for_preupload(cmd_opts),
+        adcm_credentials=adcm_credentials,
+        **params,
+    ).get_initialized_adcm_image()
 
     return init_image["repo"], init_image["tag"]
 
 
-def _adcm(image, cmd_opts, request) -> ADCM:
+def _get_bundle_urls_for_preupload(cmd_opts):
+    """
+    Analyze cmd_opts to define bundles that should be pre-uploaded
+    into ADCM at the start of the test session.
+    """
+    preupload_bundle_urls = []
+    if hasattr(cmd_opts, "cloud") and cmd_opts.cloud:
+        try:
+            preupload_bundle_urls.append(
+                "https://ci.arenadata.io/artifactory/list/adcm_bundles/"
+                f"adcm_host_{cmd_opts.cloud}_v{cmd_opts.host_version}_{cmd_opts.host_edition}.tgz"
+            )
+        except AttributeError:
+            warnings.warn("Option --cloud should be used with --host-version and --host_edition! "
+                          "See https://github.com/arenadata/adcm_pytest_tools for details")
+
+    return preupload_bundle_urls
+
+
+def _adcm(image, cmd_opts, request, adcm_credentials) -> ADCM:
     repo, tag = image
     if cmd_opts.remote_docker:
         dw = DockerWrapper(base_url=f"tcp://{cmd_opts.remote_docker}")
@@ -162,7 +195,7 @@ def _adcm(image, cmd_opts, request) -> ADCM:
         labels={"pytest_node_id": request.node.nodeid},
     )
 
-    def fin():
+    def finalize():
         if not request.config.option.dontstop:
             gather = True
             try:
@@ -194,16 +227,14 @@ def _adcm(image, cmd_opts, request) -> ADCM:
                                 extension="tgz",
                             )
 
-            _remove_hosts(adcm)
+            _remove_hosts(ADCMClient(url=adcm.url, **adcm_credentials))
 
             try:
                 adcm.container.kill()
             except DockerReadTimeout:
                 pass
 
-    request.addfinalizer(fin)
-
-    adcm.api.auth(username="admin", password="admin")
+    request.addfinalizer(finalize)
 
     return adcm
 
@@ -249,12 +280,11 @@ def _get_if_type(if_ip):
         return f.readline().strip()
 
 
-def _remove_hosts(adcm: ADCM):
-    client = ADCMClient(api=adcm.api)
-    for cluster in Paging(client.cluster_list):
+def _remove_hosts(adcm_cli: ADCMClient):
+    for cluster in Paging(adcm_cli.cluster_list):
         cluster.delete()
     jobs = list()
-    for host in Paging(client.host_list):
+    for host in Paging(adcm_cli.host_list):
         if host.state != "removed" and "remove" in list(
             map(lambda x: getattr(x, "name"), host.action_list())
         ):
@@ -290,53 +320,53 @@ def client(adcm):
 ##################################################
 @allure.title("[MS] ADCM Container")
 @pytest.fixture(scope="module")
-def adcm_ms(image, cmd_opts, request) -> ADCM:
+def adcm_ms(image, cmd_opts, request, adcm_credentials) -> ADCM:
     """Runs adcm container from the previously initialized image.
     Operates '--dontstop' option.
     Returns authorized instance of ADCM object
     """
-    return _adcm(image, cmd_opts, request)
+    return _adcm(image, cmd_opts, request, adcm_credentials)
 
 
 @allure.title("[FS] ADCM Container")
 @pytest.fixture(scope="function")
-def adcm_fs(image, cmd_opts, request) -> ADCM:
+def adcm_fs(image, cmd_opts, request, adcm_credentials) -> ADCM:
     """Runs adcm container from the previously initialized image.
     Operates '--dontstop' option.
     Returns authorized instance of ADCM object
     """
-    return _adcm(image, cmd_opts, request)
+    return _adcm(image, cmd_opts, request, adcm_credentials)
 
 
 @allure.title("[SS] ADCM Container")
 @pytest.fixture(scope="session")
-def adcm_ss(image, cmd_opts, request) -> ADCM:
+def adcm_ss(image, cmd_opts, request, adcm_credentials) -> ADCM:
     """Runs adcm container from the previously initialized image.
     Operates '--dontstop' option.
     Returns authorized instance of ADCM object
     """
-    return _adcm(image, cmd_opts, request)
+    return _adcm(image, cmd_opts, request, adcm_credentials)
 
 
 @allure.title("[MS] ADCM Client")
 @pytest.fixture(scope="module")
-def sdk_client_ms(adcm_ms: ADCM) -> ADCMClient:
+def sdk_client_ms(adcm_ms: ADCM, adcm_credentials) -> ADCMClient:
     """Returns ADCMClient object from adcm_client"""
-    return ADCMClient(api=adcm_ms.api)
+    return ADCMClient(url=adcm_ms.url, **adcm_credentials)
 
 
 @allure.title("[FS] ADCM Client")
 @pytest.fixture(scope="function")
-def sdk_client_fs(adcm_fs: ADCM) -> ADCMClient:
+def sdk_client_fs(adcm_fs: ADCM, adcm_credentials) -> ADCMClient:
     """Returns ADCMClient object from adcm_client"""
-    return ADCMClient(api=adcm_fs.api)
+    return ADCMClient(url=adcm_fs.url, **adcm_credentials)
 
 
 @allure.title("[SS] ADCM Client")
 @pytest.fixture(scope="session")
-def sdk_client_ss(adcm_ss: ADCM) -> ADCMClient:
+def sdk_client_ss(adcm_ss: ADCM, adcm_credentials) -> ADCMClient:
     """Returns ADCMClient object from adcm_client"""
-    return ADCMClient(api=adcm_ss.api)
+    return ADCMClient(url=adcm_ss.url, **adcm_credentials)
 
 
 @allure.title("Pytest options")
