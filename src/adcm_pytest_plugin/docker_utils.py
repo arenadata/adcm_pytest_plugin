@@ -220,7 +220,9 @@ class ADCMInitializer:
 
     def _preupload_bundles(self):
         if self.preupload_bundle_urls:
-            with allure.step("Pre-upload bundles into ADCM before image initialization"):
+            with allure.step(
+                "Pre-upload bundles into ADCM before image initialization"
+            ):
                 adcm_cli = ADCMClient(url=self._adcm.url, **self.adcm_api_credentials)
                 for url in self.preupload_bundle_urls:
                     try:
