@@ -218,18 +218,18 @@ class ADCMInitializer:
         self._adcm.container.remove()
         return {"repo": self.repo, "tag": self.tag}
 
-    @allure.step("Pre-upload bundles into ADCM before image initialization")
     def _preupload_bundles(self):
         if self.preupload_bundle_urls:
-            adcm_cli = ADCMClient(url=self._adcm.url, **self.adcm_api_credentials)
-            for url in self.preupload_bundle_urls:
-                try:
-                    adcm_cli.upload_from_url(url=url)
-                except ErrorMessage as exception:
-                    # skip error only if bundle was already uploaded before
-                    # can occur in case of --staticimage use
-                    if "BUNDLE_ERROR" not in exception.error:
-                        raise exception
+            with allure.step("Pre-upload bundles into ADCM before image initialization"):
+                adcm_cli = ADCMClient(url=self._adcm.url, **self.adcm_api_credentials)
+                for url in self.preupload_bundle_urls:
+                    try:
+                        adcm_cli.upload_from_url(url)
+                    except ErrorMessage as exception:
+                        # skip error only if bundle was already uploaded before
+                        # can occur in case of --staticimage use
+                        if "BUNDLE_ERROR" not in exception.error:
+                            raise exception
 
 
 def image_exists(repo, tag, dc=None):
