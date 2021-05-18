@@ -11,7 +11,6 @@
 # limitations under the License.
 
 import time
-import warnings
 from typing import Optional
 
 import allure
