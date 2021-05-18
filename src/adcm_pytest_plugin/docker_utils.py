@@ -112,6 +112,7 @@ def get_file_from_container(instance, path, filename):
         return tar.extractfile(filename)
 
 
+# pylint: disable=too-many-instance-attributes
 class ADCMInitializer:
     """
     Class for initialized ADCM image preparation.
@@ -129,6 +130,7 @@ class ADCMInitializer:
         "_adcm",
     )
 
+    # pylint: disable=too-many-arguments
     def __init__(
         self,
         repo="local/adcminit",

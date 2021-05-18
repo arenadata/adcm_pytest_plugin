@@ -302,22 +302,6 @@ def _remove_hosts(adcm_cli: ADCMClient):
                 pass
 
 
-# Legacy fixture should not be used in new tests!
-@deprecated
-@pytest.fixture(scope="module")
-def adcm(image, cmd_opts, request):
-    """Legacy ADCM object fixture. Do not use in new tests"""
-    return _adcm(image, cmd_opts, request)
-
-
-# Legacy fixture should not be used in new tests!
-@deprecated
-@pytest.fixture(scope="module")
-def client(adcm):
-    """Legacy api object fixture. Do not use in new tests"""
-    return adcm.api.objects
-
-
 ##################################################
 #                  S D K
 ##################################################
