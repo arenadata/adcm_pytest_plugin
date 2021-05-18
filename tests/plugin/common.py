@@ -2,6 +2,7 @@
 
 import allure
 
+
 def run_tests(
     testdir,
     filename: str = None,
@@ -27,8 +28,11 @@ def run_tests(
     opts = ["-s", "-v", *additional_opts]
     with allure.step(f"Run test {filename}"):
         result = testdir.runpytest(*opts)
-        allure.attach('\n'.join(result.outlines), name='Internal test output',
-                      attachment_type=allure.attachment_type.TEXT)
+        allure.attach(
+            "\n".join(result.outlines),
+            name="Internal test output",
+            attachment_type=allure.attachment_type.TEXT,
+        )
         if outcomes:
             result.assert_outcomes(**outcomes)
         else:
