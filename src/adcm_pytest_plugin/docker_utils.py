@@ -23,12 +23,14 @@ import allure
 import docker
 import tarfile
 
-from adcm_client.wrappers.api import ADCMApiWrapper
 from docker.errors import APIError, ImageNotFound
+from docker import DockerClient
 from adcm_client.util.wait import wait_for_url
 from adcm_client.objects import ADCMClient
+from adcm_client.wrappers.api import ADCMApiWrapper
 from deprecated import deprecated
 from coreapi.exceptions import ErrorMessage
+from retry.api import retry_call
 
 from .utils import random_string
 
@@ -405,3 +407,20 @@ class DockerWrapper:
             )
         with allure.step(f"ADCM API started on {ip}:{port}/api/v1"):
             return container, port
+
+
+def remove_docker_image(repo: str, tag: str, dc: DockerClient):
+    """Remove docker image"""
+    image_name = f"{repo}:{tag}"
+    for container in dc.containers.list(filters=dict(ancestor=image_name)):
+        try:
+            container.wait(condition="removed", timeout=30)
+        except ConnectionError:
+            # https://github.com/docker/docker-py/issues/1966 workaround
+            pass
+    retry_call(
+        dc.images.remove,
+        fargs=[image_name],
+        fkwargs={"force": True},
+        tries=5,
+    )

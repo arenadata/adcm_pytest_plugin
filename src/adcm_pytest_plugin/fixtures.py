@@ -25,8 +25,6 @@ from allure_commons.reporter import AllureReporter
 from allure_commons.utils import uuid4
 from allure_pytest.listener import AllureListener
 from requests.exceptions import ReadTimeout as DockerReadTimeout
-from retry.api import retry_call
-from docker import DockerClient
 
 from .docker_utils import (
     ADCM,
@@ -35,6 +33,7 @@ from .docker_utils import (
     gather_adcm_data_from_container,
     split_tag,
     ADCMInitializer,
+    remove_docker_image,
 )
 from .utils import check_mutually_exclusive, remove_host
 
@@ -117,6 +116,7 @@ def image(request, cmd_opts, adcm_api_credentials):
         def finalize():
             if init_image:
                 remove_docker_image(**init_image, dc=dc)
+
         # Set None for init image to avoid errors in finalizer
         # when get_initialized_adcm_image() fails
         init_image = None
@@ -130,23 +130,6 @@ def image(request, cmd_opts, adcm_api_credentials):
     ).get_initialized_adcm_image()
 
     return init_image["repo"], init_image["tag"]
-
-
-def remove_docker_image(repo: str, tag: str, dc: DockerClient):
-    """Remove docker image"""
-    image_name = f"{repo}:{tag}"
-    for container in dc.containers.list(filters=dict(ancestor=image_name)):
-        try:
-            container.wait(condition="removed", timeout=30)
-        except ConnectionError:
-            # https://github.com/docker/docker-py/issues/1966 workaround
-            pass
-    retry_call(
-        dc.images.remove,
-        fargs=[image_name],
-        fkwargs={"force": True},
-        tries=5,
-    )
 
 
 def _adcm(image, cmd_opts, request, adcm_api_credentials) -> ADCM:
