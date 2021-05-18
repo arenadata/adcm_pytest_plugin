@@ -1,5 +1,6 @@
 """Common methods for plugin tests"""
 
+import allure
 
 def run_tests(
     testdir,
@@ -24,9 +25,12 @@ def run_tests(
         testdir.makepyfile(py_file)
 
     opts = ["-s", "-v", *additional_opts]
-    result = testdir.runpytest(*opts)
-    if outcomes:
-        result.assert_outcomes(**outcomes)
-    else:
-        result.assert_outcomes(passed=1)
-    return result
+    with allure.step(f"Run test {filename}"):
+        result = testdir.runpytest(*opts)
+        allure.attach('\n'.join(result.outlines), name='Internal test output',
+                      attachment_type=allure.attachment_type.TEXT)
+        if outcomes:
+            result.assert_outcomes(**outcomes)
+        else:
+            result.assert_outcomes(passed=1)
+        return result
