@@ -50,6 +50,7 @@ __all__ = [
     "sdk_client_ms",
     "sdk_client_fs",
     "sdk_client_ss",
+    "adcm_credentials",
 ]
 
 
