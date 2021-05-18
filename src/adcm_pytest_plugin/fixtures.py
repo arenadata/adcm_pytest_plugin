@@ -56,7 +56,7 @@ __all__ = [
 @allure.title("ADCM credentials")
 @pytest.fixture(scope="session")
 def adcm_credentials():
-    """ ADCM credentials for use in tests"""
+    """ADCM credentials for use in tests"""
     return {"user": "admin", "password": "admin"}
 
 
