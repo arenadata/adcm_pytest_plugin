@@ -138,33 +138,11 @@ def image(request, cmd_opts, adcm_api_credentials):
     init_image = ADCMInitializer(
         pull=pull,
         dc=dc,
-        preupload_bundle_urls=_get_bundle_urls_for_preupload(cmd_opts),
         adcm_api_credentials=adcm_api_credentials,
         **params,
     ).get_initialized_adcm_image()
 
     return init_image["repo"], init_image["tag"]
-
-
-def _get_bundle_urls_for_preupload(cmd_opts):
-    """
-    Analyze cmd_opts to define bundles that should be pre-uploaded
-    into ADCM at the start of the test session.
-    """
-    preupload_bundle_urls = []
-    if hasattr(cmd_opts, "cloud") and cmd_opts.cloud:
-        try:
-            preupload_bundle_urls.append(
-                "https://ci.arenadata.io/artifactory/list/adcm_bundles/"
-                f"adcm_host_{cmd_opts.cloud}_v{cmd_opts.host_version}_{cmd_opts.host_edition}.tgz"
-            )
-        except AttributeError:
-            warnings.warn(
-                "Option --cloud should be used with --host-version and --host_edition! "
-                "See https://github.com/arenadata/adcm_pytest_tools for details"
-            )
-
-    return preupload_bundle_urls
 
 
 def _adcm(image, cmd_opts, request, adcm_api_credentials) -> ADCM:

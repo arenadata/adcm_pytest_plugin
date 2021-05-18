@@ -26,6 +26,8 @@ import tarfile
 from docker.errors import APIError, ImageNotFound
 from adcm_client.util.wait import wait_for_url
 from adcm_client.objects import ADCMClient
+from deprecated import deprecated
+from coreapi.exceptions import ErrorMessage
 
 from .utils import random_string
 
@@ -112,6 +114,28 @@ def get_file_from_container(instance, path, filename):
         return tar.extractfile(filename)
 
 
+@deprecated
+def get_initialized_adcm_image(
+    repo="local/adcminit",
+    tag=None,
+    adcm_repo=None,
+    adcm_tag=None,
+    pull=True,
+    dc=None,
+) -> dict:
+    """
+    Wrapper for backward capability
+    """
+    return ADCMInitializer(
+        repo=repo,
+        tag=tag,
+        adcm_repo=adcm_repo,
+        adcm_tag=adcm_tag,
+        pull=pull,
+        dc=dc,
+    ).get_initialized_adcm_image()
+
+
 # pylint: disable=too-many-instance-attributes
 class ADCMInitializer:
     """
@@ -196,7 +220,13 @@ class ADCMInitializer:
         if self.preupload_bundle_urls:
             adcm_cli = ADCMClient(url=self._adcm.url, **self.adcm_api_credentials)
             for url in self.preupload_bundle_urls:
-                adcm_cli.upload_from_url(url=url)
+                try:
+                    adcm_cli.upload_from_url(url=url)
+                except ErrorMessage as exception:
+                    # skip error only if bundle was already uploaded before
+                    # can occur in case of --staticimage use
+                    if "BUNDLE_ERROR" not in exception.error:
+                        raise exception
 
 
 def image_exists(repo, tag, dc=None):
