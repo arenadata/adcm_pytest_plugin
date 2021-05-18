@@ -27,7 +27,6 @@ from allure_commons.utils import uuid4
 from allure_pytest.listener import AllureListener
 from requests.exceptions import ReadTimeout as DockerReadTimeout
 from retry.api import retry_call
-from deprecated import deprecated
 
 from .docker_utils import (
     ADCM,
@@ -42,8 +41,6 @@ from .utils import check_mutually_exclusive, remove_host
 __all__ = [
     "image",
     "cmd_opts",
-    "adcm",
-    "client",
     "adcm_fs",
     "adcm_ss",
     "adcm_ms",
