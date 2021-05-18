@@ -125,7 +125,7 @@ class ADCMInitializer:
         "pull",
         "dc",
         "preupload_bundle_urls",
-        "adcm_credentials",
+        "adcm_api_credentials",
         "_adcm",
     )
 
@@ -138,7 +138,7 @@ class ADCMInitializer:
         pull=True,
         dc=None,
         preupload_bundle_urls=None,
-        adcm_credentials=None,
+        adcm_api_credentials=None,
     ):
         self.repo = repo
         self.tag = tag if tag else random_string()
@@ -147,7 +147,7 @@ class ADCMInitializer:
         self.pull = pull
         self.dc = dc if dc else docker.from_env(timeout=120)
         self.preupload_bundle_urls = preupload_bundle_urls
-        self.adcm_credentials = adcm_credentials if adcm_credentials else {}
+        self.adcm_api_credentials = adcm_api_credentials if adcm_api_credentials else {}
         self._adcm = None
 
     @allure.step("Prepare initialized ADCM image")
@@ -192,7 +192,7 @@ class ADCMInitializer:
     @allure.step("Pre-upload bundles into ADCM before image initialization")
     def _preupload_bundles(self):
         if self.preupload_bundle_urls:
-            adcm_cli = ADCMClient(url=self._adcm.url, **self.adcm_credentials)
+            adcm_cli = ADCMClient(url=self._adcm.url, **self.adcm_api_credentials)
             for url in self.preupload_bundle_urls:
                 adcm_cli.upload_from_url(url=url)
 
