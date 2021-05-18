@@ -23,6 +23,7 @@ import allure
 import docker
 import tarfile
 
+from adcm_client.wrappers.api import ADCMApiWrapper
 from docker.errors import APIError, ImageNotFound
 from adcm_client.util.wait import wait_for_url
 from adcm_client.objects import ADCMClient
@@ -280,13 +281,14 @@ class ADCM:
     and wraps docker over self.container (see docker module for info)
     """
 
-    __slots__ = ("container", "ip", "port", "url")
+    __slots__ = ("container", "ip", "port", "url", "api")
 
     def __init__(self, container, ip, port):
         self.container = container
         self.ip = ip
         self.port = port
         self.url = "http://{}:{}".format(self.ip, self.port)
+        self.api = ADCMApiWrapper(self.url)
 
     def stop(self):
         """Stops container"""
