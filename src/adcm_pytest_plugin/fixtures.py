@@ -161,8 +161,10 @@ def _get_bundle_urls_for_preupload(cmd_opts):
                 f"adcm_host_{cmd_opts.cloud}_v{cmd_opts.host_version}_{cmd_opts.host_edition}.tgz"
             )
         except AttributeError:
-            warnings.warn("Option --cloud should be used with --host-version and --host_edition! "
-                          "See https://github.com/arenadata/adcm_pytest_tools for details")
+            warnings.warn(
+                "Option --cloud should be used with --host-version and --host_edition! "
+                "See https://github.com/arenadata/adcm_pytest_tools for details"
+            )
 
     return preupload_bundle_urls
 

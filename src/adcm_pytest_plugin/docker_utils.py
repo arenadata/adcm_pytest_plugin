@@ -130,15 +130,15 @@ class ADCMInitializer:
     )
 
     def __init__(
-            self,
-            repo="local/adcminit",
-            tag=None,
-            adcm_repo=None,
-            adcm_tag=None,
-            pull=True,
-            dc=None,
-            preupload_bundle_urls=None,
-            adcm_credentials=None,
+        self,
+        repo="local/adcminit",
+        tag=None,
+        adcm_repo=None,
+        adcm_tag=None,
+        pull=True,
+        dc=None,
+        preupload_bundle_urls=None,
+        adcm_credentials=None,
     ):
         self.repo = repo
         self.tag = tag if tag else random_string()
@@ -182,7 +182,9 @@ class ADCMInitializer:
         self._preupload_bundles()
         # Create a snapshot from initialized container
         self._adcm.container.stop()
-        with allure.step(f"Commit initialized ADCM container to image {self.repo}:{self.tag}"):
+        with allure.step(
+            f"Commit initialized ADCM container to image {self.repo}:{self.tag}"
+        ):
             self._adcm.container.commit(repository=self.repo, tag=self.tag)
         self._adcm.container.remove()
         return {"repo": self.repo, "tag": self.tag}
