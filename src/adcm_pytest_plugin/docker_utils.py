@@ -44,11 +44,8 @@ class RetryCountExceeded(Exception):
 
 
 def _port_is_free(ip, port) -> bool:
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    result = sock.connect_ex((ip, port))
-    if result == 0:
-        return False
-    return True
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        return sock.connect_ex((ip, port)) != 0
 
 
 def _find_random_port(ip) -> int:
