@@ -14,11 +14,11 @@ from setuptools import setup, find_packages
 
 setup(
     name="adcm_pytest_plugin",
-    description="The pytest plugin which includes a set of common tools for ADCM testing",
+    description="The pytest plugin including a set of common tools for ADCM testing",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     include_package_data=True,
-    version="3.4.1",
+    version="4.0.0",
     # the following makes a plugin available to pytest
     entry_points={"pytest11": ["adcm_pytest_plugin = adcm_pytest_plugin.plugin"]},
     # custom PyPI classifier for pytest plugins
