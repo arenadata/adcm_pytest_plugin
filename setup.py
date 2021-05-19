@@ -14,7 +14,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="adcm_pytest_plugin",
-    description="The pytest plugin which includes a set of common tools for ADCM testing",
+    description="The pytest plugin including a set of common tools for ADCM testing",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     include_package_data=True,
