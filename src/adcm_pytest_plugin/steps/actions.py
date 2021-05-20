@@ -79,15 +79,8 @@ def _run_action_and_assert_result(
         f"Perform action '{action_name}' for {obj.__class__.__name__} '{obj_name}'"
     ), _suggest_action_if_not_exists(obj, action_name):
         task = obj.action(name=action_name).run(**kwargs)
-        result = task.wait()
-        ansible_error = ""
-        if result != expected_status and expected_status == "success":
-            ansible_error = _get_error_text_from_task_logs(task)
-        assert_action_result(
-            name=action_name,
-            result=result,
-            status=expected_status,
-            additional_message=ansible_error,
+        wait_for_task_and_assert_result(
+            task=task, action_name=action_name, status=expected_status
         )
 
 
@@ -168,11 +161,20 @@ def _suggest_action_if_not_exists(
         ) from e
 
 
-def wait_for_task_and_assert_result(task: Task, status: str):
+def wait_for_task_and_assert_result(task: Task, status: str, action_name: str = None):
     """
     Wait for a task to be completed and assert status to be equal to 'status' argument
+    If task is expected to succeed bur have failed then ansible error will be added to
+    AssertionError message
     """
-    # Need to add Action name instead of task_id when links will be provided in ADCM SDK
     with allure.step("Wait for a task to be completed"):
         result = task.wait()
-        assert_action_result(result=result, status=status)
+        ansible_error = ""
+        if result != status and status == "success":
+            ansible_error = _get_error_text_from_task_logs(task)
+        assert_action_result(
+            name=action_name if action_name else task.action().name,
+            result=result,
+            status=status,
+            additional_message=ansible_error,
+        )
