@@ -176,7 +176,7 @@ def wait_for_task_and_assert_result(
     if result != status and status == "success":
         ansible_error = _get_error_text_from_task_logs(task)
     assert_action_result(
-        name=action_name if action_name else task.action().name,
+        name=action_name or task.action().name,
         result=result,
         status=status,
         additional_message=ansible_error,
