@@ -69,6 +69,7 @@ def _run_action_and_assert_result(
     obj: Union[Cluster, Service, Host, Component, Provider],
     action_name: str,
     expected_status="success",
+    timeout=None,
     **kwargs,
 ):
     """
@@ -80,7 +81,7 @@ def _run_action_and_assert_result(
     ), _suggest_action_if_not_exists(obj, action_name):
         task = obj.action(name=action_name).run(**kwargs)
         wait_for_task_and_assert_result(
-            task=task, action_name=action_name, status=expected_status
+            task=task, action_name=action_name, status=expected_status, timeout=timeout
         )
 
 
@@ -161,20 +162,22 @@ def _suggest_action_if_not_exists(
         ) from e
 
 
-def wait_for_task_and_assert_result(task: Task, status: str, action_name: str = None):
+@allure.step("Wait for a task to be completed")
+def wait_for_task_and_assert_result(
+    task: Task, status: str, action_name: str = None, timeout=None
+):
     """
     Wait for a task to be completed and assert status to be equal to 'status' argument
     If task is expected to succeed bur have failed then ansible error will be added to
     AssertionError message
     """
-    with allure.step("Wait for a task to be completed"):
-        result = task.wait()
-        ansible_error = ""
-        if result != status and status == "success":
-            ansible_error = _get_error_text_from_task_logs(task)
-        assert_action_result(
-            name=action_name if action_name else task.action().name,
-            result=result,
-            status=status,
-            additional_message=ansible_error,
-        )
+    result = task.wait(timeout=timeout)
+    ansible_error = ""
+    if result != status and status == "success":
+        ansible_error = _get_error_text_from_task_logs(task)
+    assert_action_result(
+        name=action_name if action_name else task.action().name,
+        result=result,
+        status=status,
+        additional_message=ansible_error,
+    )
