@@ -26,7 +26,7 @@ setup(
         "pytest",
         "docker",
         "adcm_client>=2021.4.15.17",
-        "allure-pytest",
+        "allure-pytest>=2.9.42",
         "requests",
         "version_utils",
         "ifaddr",
