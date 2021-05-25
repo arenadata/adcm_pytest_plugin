@@ -222,7 +222,9 @@ class ADCMInitializer:
             with allure.step(
                 "Pre-upload bundles into ADCM before image initialization"
             ):
-                self._adcm_cli = ADCMClient(url=self._adcm.url, **self.adcm_api_credentials)
+                self._adcm_cli = ADCMClient(
+                    url=self._adcm.url, **self.adcm_api_credentials
+                )
                 for url in self.preupload_bundle_urls:
                     retry_call(
                         self._upload_bundle,
