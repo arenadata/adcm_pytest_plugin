@@ -152,6 +152,7 @@ class ADCMInitializer:
         "preupload_bundle_urls",
         "adcm_api_credentials",
         "_adcm",
+        "_adcm_cli",
     )
 
     # pylint: disable=too-many-arguments
@@ -175,6 +176,7 @@ class ADCMInitializer:
         self.preupload_bundle_urls = preupload_bundle_urls
         self.adcm_api_credentials = adcm_api_credentials if adcm_api_credentials else {}
         self._adcm = None
+        self._adcm_cli = None
 
     @allure.step("Prepare initialized ADCM image")
     def get_initialized_adcm_image(self) -> dict:
@@ -220,15 +222,24 @@ class ADCMInitializer:
             with allure.step(
                 "Pre-upload bundles into ADCM before image initialization"
             ):
-                adcm_cli = ADCMClient(url=self._adcm.url, **self.adcm_api_credentials)
+                self._adcm_cli = ADCMClient(
+                    url=self._adcm.url, **self.adcm_api_credentials
+                )
                 for url in self.preupload_bundle_urls:
-                    try:
-                        adcm_cli.upload_from_url(url)
-                    except ErrorMessage as exception:
-                        # skip error only if bundle was already uploaded before
-                        # can occur in case of --staticimage use
-                        if "BUNDLE_ERROR" not in exception.error:
-                            raise exception
+                    retry_call(
+                        self._upload_bundle,
+                        fargs=[url],
+                        tries=5,
+                    )
+
+    def _upload_bundle(self, url):
+        try:
+            self._adcm_cli.upload_from_url(url)
+        except ErrorMessage as exception:
+            # skip error only if bundle was already uploaded before
+            # can occur in case of --staticimage use
+            if "BUNDLE_ERROR" not in exception.error:
+                raise exception
 
 
 def image_exists(repo, tag, dc=None):
