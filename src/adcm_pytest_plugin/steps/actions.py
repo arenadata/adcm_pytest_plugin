@@ -23,6 +23,7 @@ from adcm_client.base import ObjectNotFound
 from adcm_client.objects import Cluster, Service, Host, Task, Component, Provider
 
 from .asserts import assert_action_result
+from ..plugin import options
 
 
 def _get_error_text_from_task_logs(task: Task):
@@ -79,7 +80,11 @@ def _run_action_and_assert_result(
     with allure.step(
         f"Perform action '{action_name}' for {obj.__class__.__name__} '{obj_name}'"
     ), _suggest_action_if_not_exists(obj, action_name):
-        task = obj.action(name=action_name).run(**kwargs)
+        if "verbose" in kwargs:
+            verbose = kwargs.pop("verbose")
+        else:
+            verbose = options.verbose_actions
+        task = obj.action(name=action_name).run(verbose=verbose, **kwargs)
         wait_for_task_and_assert_result(
             task=task, action_name=action_name, status=expected_status, timeout=timeout
         )
