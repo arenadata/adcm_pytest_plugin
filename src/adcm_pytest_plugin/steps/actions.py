@@ -19,6 +19,7 @@ from typing import Union
 from coreapi.exceptions import ErrorMessage
 
 import allure
+from version_utils import rpm
 from adcm_client.base import ObjectNotFound
 from adcm_client.objects import Cluster, Service, Host, Task, Component, Provider
 
@@ -80,10 +81,11 @@ def _run_action_and_assert_result(
     with allure.step(
         f"Perform action '{action_name}' for {obj.__class__.__name__} '{obj_name}'"
     ), _suggest_action_if_not_exists(obj, action_name):
-        if "verbose" in kwargs:
-            verbose = kwargs.pop("verbose")
-        else:
-            verbose = options.verbose_actions
+        if rpm.compare_versions(obj.adcm_version, "2021.02.04.13") >= 0:
+            if "verbose" in kwargs:
+                verbose = kwargs.pop("verbose")
+            else:
+                verbose = options.verbose_actions
         task = obj.action(name=action_name).run(verbose=verbose, **kwargs)
         wait_for_task_and_assert_result(
             task=task, action_name=action_name, status=expected_status, timeout=timeout
