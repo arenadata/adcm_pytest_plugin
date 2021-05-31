@@ -87,16 +87,11 @@ def image(request, cmd_opts, adcm_api_credentials):
     # pytest don't allow more convenient mechanisms to add mutually exclusive options.
     for opt_sets in mutually_exclusive_opts:
         if check_mutually_exclusive(cmd_opts, *opt_sets):
-            raise Exception(
-                "wrong using of import parameters %s are mutually exclusive"
-                % ", ".join(opt_sets)
-            )
+            raise Exception("wrong using of import parameters %s are mutually exclusive" % ", ".join(opt_sets))
 
     pull = not cmd_opts.nopull
     if cmd_opts.remote_docker:
-        dc = docker.DockerClient(
-            base_url=f"tcp://{cmd_opts.remote_docker}", timeout=120
-        )
+        dc = docker.DockerClient(base_url=f"tcp://{cmd_opts.remote_docker}", timeout=120)
     else:
         dc = docker.from_env(timeout=120)
 
@@ -139,11 +134,7 @@ def _adcm(image, cmd_opts, request, adcm_api_credentials) -> ADCM:
         ip = cmd_opts.remote_docker.split(":")[0]
     else:
         dw = DockerWrapper()
-        ip = (
-            _get_connection_ip(cmd_opts.remote_executor_host)
-            if cmd_opts.remote_executor_host
-            else None
-        )
+        ip = _get_connection_ip(cmd_opts.remote_executor_host) if cmd_opts.remote_executor_host else None
         if ip and is_docker():
             if _get_if_type(ip) == "0":
                 raise EnvironmentError(
@@ -250,9 +241,7 @@ def _remove_hosts(adcm_cli: ADCMClient):
         cluster.delete()
     jobs = list()
     for host in Paging(adcm_cli.host_list):
-        if host.state != "removed" and "remove" in list(
-            map(lambda x: getattr(x, "name"), host.action_list())
-        ):
+        if host.state != "removed" and "remove" in list(map(lambda x: getattr(x, "name"), host.action_list())):
             jobs.append(remove_host(host))
     if jobs:
         for job in jobs:

@@ -75,13 +75,9 @@ def pytest_addoption(parser):
         "Argument format 2020.01.30.15-c4c8b2a or 2020.01.30.15",
     )
 
-    parser.addoption(
-        "--adcm-images", nargs="+", help="List of images where to run tests"
-    )
+    parser.addoption("--adcm-images", nargs="+", help="List of images where to run tests")
 
-    parser.addoption(
-        "--nopull", action="store_true", default=False, help="Don't pull image"
-    )
+    parser.addoption("--nopull", action="store_true", default=False, help="Don't pull image")
 
     parser.addoption(
         "--remote-executor-host",
@@ -114,9 +110,7 @@ def pytest_generate_tests(metafunc):
     adcm_min_version = metafunc.config.getoption("adcm_min_version")
     adcm_images = metafunc.config.getoption("adcm_images")
 
-    params, ids = parametrized_by_adcm_version(
-        adcm_min_version=adcm_min_version, adcm_images=adcm_images
-    )
+    params, ids = parametrized_by_adcm_version(adcm_min_version=adcm_min_version, adcm_images=adcm_images)
     if params:
         metafunc.parametrize("image", params, indirect=True, ids=ids)
 
@@ -136,9 +130,7 @@ def parametrized_by_adcm_version(adcm_min_version=None, adcm_images=None):
 
 def _get_adcm_new_versions_tags(min_ver):
 
-    tags = requests.get("https://hub.arenadata.io/v2/adcm/adcm/tags/list").json()[
-        "tags"
-    ]
+    tags = requests.get("https://hub.arenadata.io/v2/adcm/adcm/tags/list").json()["tags"]
     # remove possible duplicates
     # sort to ensure same order for all xdist workers
     tags = sorted(list(set(tags)))

@@ -54,12 +54,7 @@ def test_fixture_adcm(testdir):
             line = line.split("'")
             repo_with_tag = ":".join([line[1], line[3]])
     assert (
-        len(
-            docker.from_env().containers.list(
-                filters=dict(ancestor=repo_with_tag), all=True
-            )
-        )
-        == 0
+        len(docker.from_env().containers.list(filters=dict(ancestor=repo_with_tag), all=True)) == 0
     ), f"Found running or created container with '{repo_with_tag}' ancestor"
 
 
@@ -88,9 +83,7 @@ def test_fixture_image_staticimage(testdir):
     )
 
     client = docker.from_env()
-    assert (
-        len(client.images.list(name=custom_image_name)) == 1
-    ), f"Do not found image with '{custom_image_name}' name"
+    assert len(client.images.list(name=custom_image_name)) == 1, f"Do not found image with '{custom_image_name}' name"
 
     # Remove created static image after test
     for container in client.containers.list(filters=dict(ancestor=custom_image_name)):
@@ -112,21 +105,15 @@ def test_fixture_adcm_dontstop(testdir):
         # For teardown testing. This is needed to transfer result of executing fixture to outside.
         print((repo_name, tag))
     """
-    result = run_tests(
-        testdir, py_file=run_adcm_py_file, additional_opts=["--dontstop"]
-    )
+    result = run_tests(testdir, py_file=run_adcm_py_file, additional_opts=["--dontstop"])
     repo_with_tag = ""
     for line in result.outlines:
         if "test_fixture_adcm_dontstop.py::test_run_adcm" in line:
             line = line.split("'")
             repo_with_tag = ":".join([line[1], line[3]])
-    container_list = docker.from_env().containers.list(
-        filters=dict(ancestor=repo_with_tag)
-    )
+    container_list = docker.from_env().containers.list(filters=dict(ancestor=repo_with_tag))
 
-    assert (
-        len(container_list) == 1
-    ), f"Not found running or created container with '{repo_with_tag}' ancestor"
+    assert len(container_list) == 1, f"Not found running or created container with '{repo_with_tag}' ancestor"
 
     # Stop and remove ADCM container after test
     for container in container_list:

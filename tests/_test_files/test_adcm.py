@@ -22,13 +22,6 @@ def test_adcm(image):
     """Checking that 'adcm_fs' fixture is running ADCM"""
     repo_name, tag = image
     assert (
-        len(
-            docker.from_env().containers.list(
-                filters=dict(ancestor=f"{repo_name}:{tag}")
-            )
-        )
-        == 1
+        len(docker.from_env().containers.list(filters=dict(ancestor=f"{repo_name}:{tag}"))) == 1
     ), f"Not found running container with '{repo_name}:{tag}' ancestor"
-    print(
-        (repo_name, tag)
-    )  # For teardown testing. This is needed to transfer result of executing fixture to outside.
+    print((repo_name, tag))  # For teardown testing. This is needed to transfer result of executing fixture to outside.

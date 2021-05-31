@@ -228,9 +228,7 @@ def get_data_dir(filename: str, *subdirs) -> str:
     return filename
 
 
-def get_data_subdirs_as_parameters(
-    filename: str, *subdirs
-) -> Tuple[List[str], List[str]]:
+def get_data_subdirs_as_parameters(filename: str, *subdirs) -> Tuple[List[str], List[str]]:
     """That function returns subdirs of <filename>_data in parametrize form
 
     It's really useful to iterate over subdirs with pytest.mark.parametrize.
@@ -359,9 +357,7 @@ def fixture_parametrized_by_data_subdirs(
     return pytest.fixture(scope=scope, params=cases, ids=ids)
 
 
-def wait_until_step_succeeds(
-    func, timeout: Union[int, float] = 300, period: Union[int, float] = 10, **kwargs
-):
+def wait_until_step_succeeds(func, timeout: Union[int, float] = 300, period: Union[int, float] = 10, **kwargs):
     """
     Repeat `func` with `kwargs` until successful
     >>> states = iter([False, False, True])
@@ -388,6 +384,5 @@ def wait_until_step_succeeds(
             break
         else:
             raise AssertionError(
-                f'Step "{func.__name__}" failed after retrying {timeout} seconds. '
-                f"The last error was: {last_error}"
+                f'Step "{func.__name__}" failed after retrying {timeout} seconds. ' f"The last error was: {last_error}"
             )

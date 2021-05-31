@@ -35,15 +35,7 @@ def test_image(image):
         for event in docker_image.history():
             if event["Tags"] and "local/adcminit" in event["Tags"][0]:
                 if test_start_time < event["Created"]:
-                    created_image_list.append(
-                        {
-                            event["Tags"][0]: str(
-                                datetime.fromtimestamp(event["Created"])
-                            )
-                        }
-                    )
+                    created_image_list.append({event["Tags"][0]: str(datetime.fromtimestamp(event["Created"]))})
     assert len(created_image_list) != 0, "Image not created"
     assert len(created_image_list) == 1, "More than 1 image created"
-    print(
-        (repo_name, tag)
-    )  # For teardown testing. This is needed to transfer result of executing fixture to outside.
+    print((repo_name, tag))  # For teardown testing. This is needed to transfer result of executing fixture to outside.

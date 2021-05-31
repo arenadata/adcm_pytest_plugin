@@ -31,6 +31,4 @@ def test_fail_action(sdk_client_fs, bundle_dir):
     cluster = bundle.cluster_create("test_cluster")
     with pytest.raises(AssertionError) as action_run_exception:
         run_cluster_action_and_assert_result(cluster=cluster, action="fail_action")
-    assert "Meant to fail" in str(
-        action_run_exception.value
-    ), "No ansible error in AssertionError message"
+    assert "Meant to fail" in str(action_run_exception.value), "No ansible error in AssertionError message"
