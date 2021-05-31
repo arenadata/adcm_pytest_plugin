@@ -63,7 +63,5 @@ def test_verbose_actions_option_with_custom_verbose(sdk_client_fs, bundle_dir):
     bundle = sdk_client_fs.upload_from_fs(bundle_dir_full)
     cluster = bundle.cluster_create("test_cluster")
     options.verbose_actions = True
-    run_cluster_action_and_assert_result(
-        cluster=cluster, action="simple_action", verbose=False
-    )
+    run_cluster_action_and_assert_result(cluster=cluster, action="simple_action", verbose=False)
     assert "verbosity: 4" not in sdk_client_fs.job_list()[0].log_list()[0].content
