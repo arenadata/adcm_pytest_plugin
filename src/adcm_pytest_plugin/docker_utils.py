@@ -203,28 +203,20 @@ class ADCMInitializer:
         else:
             # then dc.api.base_url is most likely http+docker://localhost
             ip = None
-        self._adcm = dw.run_adcm(
-            image=self.adcm_repo, tag=self.adcm_tag, remove=False, pull=self.pull, ip=ip
-        )
+        self._adcm = dw.run_adcm(image=self.adcm_repo, tag=self.adcm_tag, remove=False, pull=self.pull, ip=ip)
         # Pre-upload bundles to ADCM before image initialization
         self._preupload_bundles()
         # Create a snapshot from initialized container
         self._adcm.container.stop()
-        with allure.step(
-            f"Commit initialized ADCM container to image {self.repo}:{self.tag}"
-        ):
+        with allure.step(f"Commit initialized ADCM container to image {self.repo}:{self.tag}"):
             self._adcm.container.commit(repository=self.repo, tag=self.tag)
         self._adcm.container.remove()
         return {"repo": self.repo, "tag": self.tag}
 
     def _preupload_bundles(self):
         if self.preupload_bundle_urls:
-            with allure.step(
-                "Pre-upload bundles into ADCM before image initialization"
-            ):
-                self._adcm_cli = ADCMClient(
-                    url=self._adcm.url, **self.adcm_api_credentials
-                )
+            with allure.step("Pre-upload bundles into ADCM before image initialization"):
+                self._adcm_cli = ADCMClient(url=self._adcm.url, **self.adcm_api_credentials)
                 for url in self.preupload_bundle_urls:
                     retry_call(
                         self._upload_bundle,
@@ -279,12 +271,8 @@ def _wait_for_adcm_container_init(container, container_ip, port, timeout=120):
         try:
             container.kill()
         except APIError:
-            additional_message = (
-                " \nWARNING: Failed to kill docker container. Try to remove it by hand"
-            )
-        raise TimeoutError(
-            f"ADCM API has not responded in {timeout} seconds{additional_message}"
-        )
+            additional_message = " \nWARNING: Failed to kill docker container. Try to remove it by hand"
+        raise TimeoutError(f"ADCM API has not responded in {timeout} seconds{additional_message}")
 
 
 class ADCM:
@@ -363,9 +351,7 @@ class DockerWrapper:
         # will be local container loop interface instead of host loop interface,
         # so we need to establish ADCM API connection using internal docker network
         if ip == DEFAULT_IP and is_docker():
-            container_ip = self.client.api.inspect_container(container.id)[
-                "NetworkSettings"
-            ]["IPAddress"]
+            container_ip = self.client.api.inspect_container(container.id)["NetworkSettings"]["IPAddress"]
             port = "8000"
         else:
             container_ip = ip
@@ -412,9 +398,7 @@ class DockerWrapper:
                 else:
                     raise err
         else:
-            raise RetryCountExceeded(
-                f"Unable to start container after {CONTAINER_START_RETRY_COUNT} retries"
-            )
+            raise RetryCountExceeded(f"Unable to start container after {CONTAINER_START_RETRY_COUNT} retries")
         with allure.step(f"ADCM API started on {ip}:{port}/api/v1"):
             return container, port
 

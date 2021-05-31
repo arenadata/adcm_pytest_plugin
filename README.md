@@ -12,6 +12,8 @@ The `pytest` plugin which includes a set of common tools for ADCM tests.
 - [Command line options](#command-line-options)
 - [Writing tests for plugin](#writing-tests-for-plugin)
 - [How to run unit tests for plugin](#how-to-run-unit-tests-for-plugin)
+- [Pre-commit hook](#pre-commit-hook)
+
 
 ## Requirements
 
@@ -343,3 +345,16 @@ To open allure report, you can execute this:
 ```
 allure serve allure-result
 ```
+
+## Pre-commit hook
+
+We are using black, pylint and pre-commit to care about code formating and linting.
+
+So you have to install pre-commit hook before you do something with code.
+
+``` sh
+pip install pre-commit # Or do it with your preffered way to install pip packages
+pre-commit install
+```
+
+After this you will see invocation of black and pylint on every commit.

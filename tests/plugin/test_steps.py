@@ -32,9 +32,7 @@ def test_fail_action(sdk_client_fs, bundle_dir):
     cluster = bundle.cluster_create("test_cluster")
     with pytest.raises(AssertionError) as action_run_exception:
         run_cluster_action_and_assert_result(cluster=cluster, action="fail_action")
-    assert "Meant to fail" in str(
-        action_run_exception.value
-    ), "No ansible error in AssertionError message"
+    assert "Meant to fail" in str(action_run_exception.value), "No ansible error in AssertionError message"
 
 
 @pytest.mark.parametrize("bundle_dir", ["simple_action_cluster"])
@@ -65,7 +63,5 @@ def test_verbose_actions_option_with_custom_verbose(sdk_client_fs, bundle_dir):
     bundle = sdk_client_fs.upload_from_fs(bundle_dir_full)
     cluster = bundle.cluster_create("test_cluster")
     options.verbose_actions = True
-    run_cluster_action_and_assert_result(
-        cluster=cluster, action="simple_action", verbose=False
-    )
+    run_cluster_action_and_assert_result(cluster=cluster, action="simple_action", verbose=False)
     assert "verbosity: 4" not in sdk_client_fs.job_list()[0].log_list()[0].content

@@ -81,76 +81,49 @@ def _run_action_and_assert_result(
     with allure.step(
         f"Perform action '{action_name}' for {obj.__class__.__name__} '{obj_name}'"
     ), _suggest_action_if_not_exists(obj, action_name):
-        if (
-            rpm.compare_versions(obj.adcm_version, "2021.02.04.13") >= 0
-            and "verbose" not in kwargs
-        ):
+        if rpm.compare_versions(obj.adcm_version, "2021.02.04.13") >= 0 and "verbose" not in kwargs:
             kwargs["verbose"] = options.verbose_actions
         task = obj.action(name=action_name).run(**kwargs)
-        wait_for_task_and_assert_result(
-            task=task, action_name=action_name, status=expected_status, timeout=timeout
-        )
+        wait_for_task_and_assert_result(task=task, action_name=action_name, status=expected_status, timeout=timeout)
 
 
-def run_cluster_action_and_assert_result(
-    cluster: Cluster, action: str, status="success", **kwargs
-):
+def run_cluster_action_and_assert_result(cluster: Cluster, action: str, status="success", **kwargs):
     """
     Run cluster action and assert that status equals to 'status' argument
     """
-    _run_action_and_assert_result(
-        obj=cluster, action_name=action, expected_status=status, **kwargs
-    )
+    _run_action_and_assert_result(obj=cluster, action_name=action, expected_status=status, **kwargs)
 
 
-def run_service_action_and_assert_result(
-    service: Service, action: str, status="success", **kwargs
-):
+def run_service_action_and_assert_result(service: Service, action: str, status="success", **kwargs):
     """
     Run service action and assert that status equals to 'status' argument
     """
-    _run_action_and_assert_result(
-        obj=service, action_name=action, expected_status=status, **kwargs
-    )
+    _run_action_and_assert_result(obj=service, action_name=action, expected_status=status, **kwargs)
 
 
-def run_component_action_and_assert_result(
-    component: Component, action: str, status="success", **kwargs
-):
+def run_component_action_and_assert_result(component: Component, action: str, status="success", **kwargs):
     """
     Run component action and assert that status equals to 'status' argument
     """
-    _run_action_and_assert_result(
-        obj=component, action_name=action, expected_status=status, **kwargs
-    )
+    _run_action_and_assert_result(obj=component, action_name=action, expected_status=status, **kwargs)
 
 
-def run_host_action_and_assert_result(
-    host: Host, action: str, status="success", **kwargs
-):
+def run_host_action_and_assert_result(host: Host, action: str, status="success", **kwargs):
     """
     Run host action and assert that status equals to 'status' argument
     """
-    _run_action_and_assert_result(
-        obj=host, action_name=action, expected_status=status, **kwargs
-    )
+    _run_action_and_assert_result(obj=host, action_name=action, expected_status=status, **kwargs)
 
 
-def run_provider_action_and_assert_result(
-    provider: Provider, action: str, status="success", **kwargs
-):
+def run_provider_action_and_assert_result(provider: Provider, action: str, status="success", **kwargs):
     """
     Run provider action and assert that status equals to 'status' argument
     """
-    _run_action_and_assert_result(
-        obj=provider, action_name=action, expected_status=status, **kwargs
-    )
+    _run_action_and_assert_result(obj=provider, action_name=action, expected_status=status, **kwargs)
 
 
 @contextmanager
-def _suggest_action_if_not_exists(
-    obj: Union[Cluster, Service, Host, Component], action
-):
+def _suggest_action_if_not_exists(obj: Union[Cluster, Service, Host, Component], action):
     """
     Contextmanager that suggest action if for some reason the required action was not found
     """
@@ -160,19 +133,13 @@ def _suggest_action_if_not_exists(
         all_actions = [a.name for a in obj.action_list()]
         suggest_actions = ", ".join(get_close_matches(action, all_actions))
         if suggest_actions:
-            raise ObjectNotFound(
-                f"No such action {action}. Did you mean: {suggest_actions}?"
-            ) from e
+            raise ObjectNotFound(f"No such action {action}. Did you mean: {suggest_actions}?") from e
         all_actions = ", ".join(all_actions)
-        raise ObjectNotFound(
-            f"No such action {action}. Possible actions: {all_actions}."
-        ) from e
+        raise ObjectNotFound(f"No such action {action}. Possible actions: {all_actions}.") from e
 
 
 @allure.step("Wait for a task to be completed")
-def wait_for_task_and_assert_result(
-    task: Task, status: str, action_name: str = None, timeout=None
-):
+def wait_for_task_and_assert_result(task: Task, status: str, action_name: str = None, timeout=None):
     """
     Wait for a task to be completed and assert status to be equal to 'status' argument
     If task is expected to succeed bur have failed then ansible error will be added to

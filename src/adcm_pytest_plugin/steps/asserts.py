@@ -40,13 +40,8 @@ def assert_state(obj: BaseAPIObject, state):
         name = obj.fqdn
     else:
         name = obj.__repr__()
-    with allure.step(
-        f"Assert state of {obj.__class__.__name__} '{name}' to be equal to '{state}'"
-    ):
-        assert obj.state == state, (
-            f"Object '{name}' have unexpected state - '{obj.state}'. "
-            f"Expected - '{state}'"
-        )
+    with allure.step(f"Assert state of {obj.__class__.__name__} '{name}' to be equal to '{state}'"):
+        assert obj.state == state, f"Object '{name}' have unexpected state - '{obj.state}'. " f"Expected - '{state}'"
 
 
 @allure.step("Assert action result to be equal to {status}")
@@ -70,10 +65,7 @@ def assert_action_result(result: str, status: str, name="", additional_message="
     AssertionError: Action  finished execution with unexpected result - '200'. Expected - '500'
     My custom message
     """
-    message = (
-        f"Action {name} finished execution with unexpected result - '{result}'. "
-        f"Expected - '{status}'"
-    )
+    message = f"Action {name} finished execution with unexpected result - '{result}'. " f"Expected - '{status}'"
     if additional_message:
         message += f"\n{additional_message}"
     assert result == status, message
