@@ -104,6 +104,15 @@ def pytest_addoption(parser):
         "Ex: '192.168.1.1:2375'",
     )
 
+    parser.addoption(
+        "--verbose-actions",
+        action="store_true",
+        default=False,
+        help="Run actions with 'verbose' checkbox selected. "
+        "Applied only to action calls over adcm_client."
+        "Does not affect UI action calls in tests",
+    )
+
 
 def pytest_generate_tests(metafunc):
     """

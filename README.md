@@ -172,6 +172,7 @@ List of available options:
 - Misc
     - [`--remote-executor-host`](#--remote-executor-host)
     - [`--remote-docker`](#--remote-docker)
+    - [`--verbose-actions`](#--verbose-actions)
 
 ---
 
@@ -267,6 +268,19 @@ Property | Value
 value | `string of host:port format`
 default | `none`
 example | `--remote-docker '10.92.7.14:2375'`
+
+#### `--verbose-actions`
+
+> If passed then ADCM actions will be started with 'verbose' checkbox selected.
+> Applied only to action calls over adcm_client. 
+> Does not affect UI action calls in tests.
+
+
+Property | Value
+---: | ---
+value | `none`
+default | `false`
+
 
 ## Writing tests for plugin
 
