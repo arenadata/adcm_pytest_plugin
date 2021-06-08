@@ -10,15 +10,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import socket
 import time
-from typing import Optional
+from contextlib import suppress
+from typing import Generator, Optional
 
 import allure
 import docker
 import ifaddr
 import pytest
-import socket
-
+from _pytest.fixtures import SubRequest
 from adcm_client.base import Paging, WaitTimeout
 from adcm_client.objects import ADCMClient
 from allure_commons.reporter import AllureReporter
@@ -28,12 +29,12 @@ from requests.exceptions import ReadTimeout as DockerReadTimeout
 
 from .docker_utils import (
     ADCM,
-    DockerWrapper,
-    is_docker,
-    gather_adcm_data_from_container,
-    split_tag,
     ADCMInitializer,
+    DockerWrapper,
+    gather_adcm_data_from_container,
+    is_docker,
     remove_docker_image,
+    split_tag,
 )
 from .utils import check_mutually_exclusive, remove_host
 
@@ -106,17 +107,6 @@ def image(request, cmd_opts, adcm_api_credentials):
     elif cmd_opts.adcm_image:
         params["adcm_repo"], params["adcm_tag"] = split_tag(cmd_opts.adcm_image)
 
-    if not (cmd_opts.dontstop or cmd_opts.staticimage):
-
-        def finalize():
-            if init_image:
-                remove_docker_image(**init_image, dc=dc)
-
-        # Set None for init image to avoid errors in finalizer
-        # when get_initialized_adcm_image() fails
-        init_image = None
-        request.addfinalizer(finalize)
-
     init_image = ADCMInitializer(
         pull=pull,
         dc=dc,
@@ -124,10 +114,15 @@ def image(request, cmd_opts, adcm_api_credentials):
         **params,
     ).get_initialized_adcm_image()
 
-    return init_image["repo"], init_image["tag"]
+    yield init_image["repo"], init_image["tag"]
+
+    if cmd_opts.dontstop or cmd_opts.staticimage:
+        return  # leave image intact
+
+    remove_docker_image(**init_image, dc=dc)
 
 
-def _adcm(image, cmd_opts, request, adcm_api_credentials) -> ADCM:
+def _adcm(image, cmd_opts, request, adcm_api_credentials) -> Generator[ADCM, None, None]:
     repo, tag = image
     if cmd_opts.remote_docker:
         dw = DockerWrapper(base_url=f"tcp://{cmd_opts.remote_docker}")
@@ -151,48 +146,24 @@ def _adcm(image, cmd_opts, request, adcm_api_credentials) -> ADCM:
         labels={"pytest_node_id": request.node.nodeid},
     )
 
-    def finalize():
-        if not request.config.option.dontstop:
-            gather = True
-            try:
-                if not request.node.rep_call.failed:
-                    gather = False
-            except AttributeError:
-                # There is no rep_call attribute. Presumably test setup failed,
-                # or fixture scope is not function. Will collect /adcm/data anyway
-                pass
-            if gather:
-                with allure.step("Gather /adcm/data/ from ADCM container"):
-                    file_name = f"ADCM Log {request.node.name}_{time.time()}"
-                    reporter = _allure_reporter(request.config)
-                    if reporter:
-                        test_result = reporter.get_test(uuid=None)
-                        with gather_adcm_data_from_container(adcm) as data:
-                            reporter.attach_data(
-                                uuid=uuid4(),
-                                body=data,
-                                name="{}.tgz".format(file_name),
-                                extension="tgz",
-                                parent_uuid=test_result.uuid,
-                            )
-                    else:
-                        with gather_adcm_data_from_container(adcm) as data:
-                            allure.attach(
-                                body=data,
-                                name="{}.tgz".format(file_name),
-                                extension="tgz",
-                            )
+    yield adcm
 
-            _remove_hosts(ADCMClient(url=adcm.url, **adcm_api_credentials))
+    if request.config.option.dontstop:
+        return  # leave container intact
 
-            try:
-                adcm.container.kill()
-            except DockerReadTimeout:
-                pass
+    gather = True
+    # If there is no rep_call attribute, presumably test setup failed,
+    # or fixture scope is not function. Will collect /adcm/data anyway.
+    with suppress(AttributeError):
+        if not request.node.rep_call.failed:
+            gather = False
+    if gather:
+        _attach_adcm_logs(request, adcm)
 
-    request.addfinalizer(finalize)
+    _remove_hosts(ADCMClient(url=adcm.url, **adcm_api_credentials))
 
-    return adcm
+    with suppress(DockerReadTimeout):
+        adcm.container.kill()
 
 
 def _allure_reporter(config) -> Optional[AllureReporter]:
@@ -205,6 +176,29 @@ def _allure_reporter(config) -> Optional[AllureReporter]:
         None,
     )
     return listener.allure_logger if listener else None
+
+
+@allure.step("Gather /adcm/data/ from ADCM container")
+def _attach_adcm_logs(request: SubRequest, adcm: ADCM):
+    file_name = f"ADCM Log {request.node.name}_{time.time()}"
+    reporter = _allure_reporter(request.config)
+    if reporter:
+        test_result = reporter.get_test(uuid=None)
+        with gather_adcm_data_from_container(adcm) as data:
+            reporter.attach_data(
+                uuid=uuid4(),
+                body=data,
+                name="{}.tgz".format(file_name),
+                extension="tgz",
+                parent_uuid=test_result.uuid,
+            )
+    else:
+        with gather_adcm_data_from_container(adcm) as data:
+            allure.attach(
+                body=data,
+                name="{}.tgz".format(file_name),
+                extension="tgz",
+            )
 
 
 def _get_connection_ip(remote_host: str):
@@ -243,14 +237,11 @@ def _remove_hosts(adcm_cli: ADCMClient):
     for host in Paging(adcm_cli.host_list):
         if host.state != "removed" and "remove" in list(map(lambda x: getattr(x, "name"), host.action_list())):
             jobs.append(remove_host(host))
-    if jobs:
-        for job in jobs:
-            try:
-                job.wait(timeout=60)
-            # I case when host were not removed in requested timeout
-            # we don't want it to affect test result
-            except WaitTimeout:
-                pass
+    for job in jobs:
+        # In case when host were not removed in requested timeout
+        # we don't want it to affect test result
+        with suppress(WaitTimeout):
+            job.wait(timeout=60)
 
 
 ##################################################
@@ -258,32 +249,32 @@ def _remove_hosts(adcm_cli: ADCMClient):
 ##################################################
 @allure.title("[MS] ADCM Container")
 @pytest.fixture(scope="module")
-def adcm_ms(image, cmd_opts, request, adcm_api_credentials) -> ADCM:
+def adcm_ms(image, cmd_opts, request, adcm_api_credentials) -> Generator[ADCM, None, None]:
     """Runs adcm container from the previously initialized image.
     Operates '--dontstop' option.
     Returns authorized instance of ADCM object
     """
-    return _adcm(image, cmd_opts, request, adcm_api_credentials)
+    yield from _adcm(image, cmd_opts, request, adcm_api_credentials)
 
 
 @allure.title("[FS] ADCM Container")
 @pytest.fixture(scope="function")
-def adcm_fs(image, cmd_opts, request, adcm_api_credentials) -> ADCM:
+def adcm_fs(image, cmd_opts, request, adcm_api_credentials) -> Generator[ADCM, None, None]:
     """Runs adcm container from the previously initialized image.
     Operates '--dontstop' option.
     Returns authorized instance of ADCM object
     """
-    return _adcm(image, cmd_opts, request, adcm_api_credentials)
+    yield from _adcm(image, cmd_opts, request, adcm_api_credentials)
 
 
 @allure.title("[SS] ADCM Container")
 @pytest.fixture(scope="session")
-def adcm_ss(image, cmd_opts, request, adcm_api_credentials) -> ADCM:
+def adcm_ss(image, cmd_opts, request, adcm_api_credentials) -> Generator[ADCM, None, None]:
     """Runs adcm container from the previously initialized image.
     Operates '--dontstop' option.
     Returns authorized instance of ADCM object
     """
-    return _adcm(image, cmd_opts, request, adcm_api_credentials)
+    yield from _adcm(image, cmd_opts, request, adcm_api_credentials)
 
 
 @allure.title("[MS] ADCM Client")
