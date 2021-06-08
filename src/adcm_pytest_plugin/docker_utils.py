@@ -14,22 +14,22 @@
 import io
 import os
 import re
-import random
 import socket
+import string
+import tarfile
 from contextlib import contextmanager
 from gzip import compress
 
 import allure
 import docker
-import tarfile
-
-from docker.errors import APIError, ImageNotFound
-from docker import DockerClient
-from adcm_client.util.wait import wait_for_url
+import pytest
 from adcm_client.objects import ADCMClient
+from adcm_client.util.wait import wait_for_url
 from adcm_client.wrappers.api import ADCMApiWrapper
-from deprecated import deprecated
 from coreapi.exceptions import ErrorMessage
+from deprecated import deprecated
+from docker import DockerClient
+from docker.errors import APIError, ImageNotFound
 from retry.api import retry_call
 
 from .utils import random_string
@@ -38,6 +38,7 @@ MIN_DOCKER_PORT = 8000
 MAX_DOCKER_PORT = 9000
 DEFAULT_IP = "127.0.0.1"
 CONTAINER_START_RETRY_COUNT = 20
+MAX_WORKER_COUNT = 80
 
 
 class UnableToBind(Exception):
@@ -53,12 +54,19 @@ def _port_is_free(ip, port) -> bool:
         return sock.connect_ex((ip, port)) != 0
 
 
-def _find_random_port(ip) -> int:
-    for _ in range(0, 20):
-        port = random.randint(MIN_DOCKER_PORT, MAX_DOCKER_PORT)
+def _find_port(ip, port_from: int = 0) -> int:
+    gw_count = os.environ.get("PYTEST_XDIST_WORKER_COUNT", 0)
+    if int(gw_count) > MAX_WORKER_COUNT:
+        pytest.exit("Expected maximum workers count is {MAX_WORKER_COUNT}.")
+    gw_name = os.environ.get("PYTEST_XDIST_WORKER", "gw0")
+    gw_number = int(gw_name.strip(string.ascii_letters))
+    range_length = (MAX_DOCKER_PORT - MIN_DOCKER_PORT) // MAX_WORKER_COUNT
+    offset = MIN_DOCKER_PORT + gw_number * range_length
+    range_start = max(port_from, offset)
+    for port in range(range_start, range_start + range_length):
         if _port_is_free(ip, port):
             return port
-    raise UnableToBind("There is no free port for Docker after 20 tries.")
+    raise UnableToBind("There is no free port for the given worker.")
 
 
 def is_docker() -> bool:
@@ -374,8 +382,8 @@ class DockerWrapper:
         Run ADCM in docker image.
         Return ADCM container and bind port.
         """
+        port = _find_port(ip)
         for _ in range(0, CONTAINER_START_RETRY_COUNT):
-            port = _find_random_port(ip)
             try:
                 container = self.client.containers.run(
                     "{}:{}".format(image, tag),
@@ -394,7 +402,8 @@ class DockerWrapper:
                 ):
                     # such error excepting leaves created container and there is
                     # no way to clean it other than from docker library
-                    pass
+                    # try to find next one port
+                    port = _find_port(ip, port + 1)
                 else:
                     raise err
         else:
