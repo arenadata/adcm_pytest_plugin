@@ -122,7 +122,7 @@ def image(request, cmd_opts, adcm_api_credentials):
     remove_docker_image(**init_image, dc=dc)
 
 
-def _adcm(image, cmd_opts, request, adcm_api_credentials) -> ADCM:
+def _adcm(image, cmd_opts, request, adcm_api_credentials) -> Generator[ADCM, None, None]:
     repo, tag = image
     if cmd_opts.remote_docker:
         dw = DockerWrapper(base_url=f"tcp://{cmd_opts.remote_docker}")
