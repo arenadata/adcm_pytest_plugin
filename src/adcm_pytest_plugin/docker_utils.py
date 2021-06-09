@@ -212,7 +212,7 @@ class ADCMInitializer:
             ip_start = base_url.rfind("/") + 1
             ip_end = base_url.rfind(":")
             config.ip = base_url[ip_start:ip_end]
-        self._adcm = dw.run_adcm(config)
+        self._adcm = dw.run_adcm_from_config(config)
         # Pre-upload bundles to ADCM before image initialization
         self._preupload_bundles()
         # Create a snapshot from initialized container
@@ -291,9 +291,9 @@ class ContainerConfig:
     image: str = "hub.arenadata.io/adcm/adcm"
     tag: str = "latest"
     pull: bool = True
-    ip: str = DEFAULT_IP
     labels: dict = field(default_factory=dict)
     remove: bool = True
+    ip: Optional[str] = None
     volumes: Optional[dict] = None
     name: Optional[str] = None
 
@@ -304,11 +304,11 @@ class ADCM:
     and wraps docker over self.container (see docker module for info)
     """
 
-    __slots__ = ("container", "config", "ip", "port", "url", "api")
+    __slots__ = ("container", "container_config", "ip", "port", "url", "api")
 
-    def __init__(self, container: Container, ip: str, port: str, config: ContainerConfig):
+    def __init__(self, container: Container, ip: str, port: str, container_config: Optional[ContainerConfig]):
         self.container = container
-        self.config = config
+        self.container_config = container_config
         self.ip = ip
         self.port = port
         self.url = "http://{}:{}".format(self.ip, self.port)
@@ -327,8 +327,41 @@ class DockerWrapper:
     def __init__(self, base_url="unix://var/run/docker.sock", dc=None):
         self.client = dc if dc else docker.DockerClient(base_url=base_url, timeout=120)
 
-    # pylint: disable=R0913
-    def run_adcm(self, config: ContainerConfig):
+    # pylint: disable=too-many-arguments
+    @deprecated(reason="use run_adcm_from_config method")
+    def run_adcm(
+        self,
+        image=None,
+        labels=None,
+        remove=True,
+        pull=True,
+        name=None,
+        tag=None,
+        ip=None,
+        volumes=None,
+    ):
+        """
+        Run ADCM in docker image.
+        Return ADCM instance.
+
+        Example:
+        adcm = docker.run(image='arenadata/adcm', tag=None, ip='127.0.0.1')
+
+        If tag is None or is not present than a tag 'latest' will be used
+        """
+        config = ContainerConfig(
+            image=image,  # keep from black
+            labels=labels,
+            remove=remove,
+            pull=pull,
+            name=name,
+            tag=tag,
+            ip=ip or DEFAULT_IP,
+            volumes=volumes,
+        )
+        return self.run_adcm_from_config(config)
+
+    def run_adcm_from_config(self, config: ContainerConfig):
         """
         Run ADCM in docker image.
         Return ADCM instance.
@@ -342,8 +375,9 @@ class DockerWrapper:
             self.client.images.pull(config.image, config.tag)
         if os.environ.get("BUILD_TAG"):
             config.labels.update({"jenkins-job": os.environ["BUILD_TAG"]})
+        config.ip = config.ip or DEFAULT_IP
 
-        container, port = self.adcm_container(config)
+        container, port = self.adcm_container_from_config(config)
 
         # If test runner is running in docker then 127.0.0.1
         # will be local container loop interface instead of host loop interface,
@@ -352,11 +386,33 @@ class DockerWrapper:
             config.ip = self.client.api.inspect_container(container.id)["NetworkSettings"]["IPAddress"]
             port = "8000"
         _wait_for_adcm_container_init(container, config.ip, port)
-        return ADCM(container, config.ip, port, config)
+        return ADCM(container, config.ip, port, container_config=config)
 
-    # pylint: disable=R0913
+    # pylint: disable=too-many-arguments
+    @deprecated(reason="use adcm_container_from_config")
+    def adcm_container(
+        self,
+        image=None,
+        labels=None,
+        remove=True,
+        name=None,
+        tag=None,
+        ip=None,
+        volumes=None,
+    ):
+        config = ContainerConfig(
+            image=image,  # keep from black
+            labels=labels,
+            remove=remove,
+            name=name,
+            tag=tag,
+            ip=ip,
+            volumes=volumes,
+        )
+        return self.adcm_container_from_config(config)
+
     @allure.step("Run ADCM container")
-    def adcm_container(self, config: ContainerConfig):
+    def adcm_container_from_config(self, config: ContainerConfig):
         """
         Run ADCM in docker image.
         Return ADCM container and bind port.

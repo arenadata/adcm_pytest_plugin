@@ -126,7 +126,6 @@ def image(request, cmd_opts, adcm_api_credentials):
 def _adcm(image, cmd_opts, request, adcm_api_credentials) -> Generator[ADCM, None, None]:
     repo, tag = image
     labels = {"pytest_node_id": request.node.nodeid}
-    config = ContainerConfig(image=repo, tag=tag, pull=False, labels=labels)
     if cmd_opts.remote_docker:
         dw = DockerWrapper(base_url=f"tcp://{cmd_opts.remote_docker}")
         ip = cmd_opts.remote_docker.split(":")[0]
@@ -141,8 +140,8 @@ def _adcm(image, cmd_opts, request, adcm_api_credentials) -> Generator[ADCM, Non
                     "There is no obvious way to get external ip in this case."
                     "Try running container with pytest with --net=host option"
                 )
-    config.ip = ip or config.ip
-    adcm = dw.run_adcm(config)
+    config = ContainerConfig(image=repo, tag=tag, pull=False, ip=ip, labels=labels)
+    adcm = dw.run_adcm_from_config(config)
 
     yield adcm
 
