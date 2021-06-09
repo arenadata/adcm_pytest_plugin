@@ -18,7 +18,7 @@ import socket
 import string
 import tarfile
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from gzip import compress
 from typing import Optional
 
