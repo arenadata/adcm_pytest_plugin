@@ -20,7 +20,7 @@ import tarfile
 from contextlib import contextmanager
 from dataclasses import dataclass
 from gzip import compress
-from typing import Optional
+from typing import Optional, Tuple
 
 import allure
 import docker
@@ -416,12 +416,17 @@ class DockerWrapper:
         )
         return self.adcm_container_from_config(config)
 
-    @allure.step("Run ADCM container")
     def adcm_container_from_config(self, config: ContainerConfig):
         """
         Run ADCM in docker image.
         Return ADCM container and bind port.
         """
+        with allure.step(f"Run ADCM container from {config.image}:{config.tag}"):
+            container, port = self._run_container_on_free_port(config)
+        with allure.step(f"ADCM API started on {config.ip}:{port}/api/v1"):
+            return container, port
+
+    def _run_container_on_free_port(self, config: ContainerConfig) -> Tuple[Container, int]:
         port = _find_port(config.ip)
         for _ in range(0, CONTAINER_START_RETRY_COUNT):
             try:
@@ -434,7 +439,7 @@ class DockerWrapper:
                     name=config.name,
                     detach=True,
                 )
-                break
+                return container, port
             except APIError as err:
                 if (
                     "failed: port is already allocated" in err.explanation
@@ -446,10 +451,7 @@ class DockerWrapper:
                     port = _find_port(config.ip, port + 1)
                 else:
                     raise err
-        else:
-            raise RetryCountExceeded(f"Unable to start container after {CONTAINER_START_RETRY_COUNT} retries")
-        with allure.step(f"ADCM API started on {config.ip}:{port}/api/v1"):
-            return container, port
+        raise RetryCountExceeded(f"Unable to start container after {CONTAINER_START_RETRY_COUNT} retries")
 
 
 def remove_docker_image(repo: str, tag: str, dc: DockerClient):
