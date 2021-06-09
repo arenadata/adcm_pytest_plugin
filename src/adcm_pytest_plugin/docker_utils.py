@@ -291,11 +291,17 @@ class ContainerConfig:
     image: str = "hub.arenadata.io/adcm/adcm"
     tag: str = "latest"
     pull: bool = True
-    labels: dict = field(default_factory=dict)
     remove: bool = True
+    labels: Optional[dict] = None
     ip: Optional[str] = None
     volumes: Optional[dict] = None
     name: Optional[str] = None
+
+    def __post_init__(self):
+        """Default values for some fields overwritten by None,
+        therefore we have to init them with expected defaults."""
+        self.ip = self.ip or DEFAULT_IP
+        self.labels = self.labels or {}
 
 
 class ADCM:
@@ -356,7 +362,7 @@ class DockerWrapper:
             pull=pull,
             name=name,
             tag=tag,
-            ip=ip or DEFAULT_IP,
+            ip=ip,
             volumes=volumes,
         )
         return self.run_adcm_from_config(config)
@@ -375,7 +381,6 @@ class DockerWrapper:
             self.client.images.pull(config.image, config.tag)
         if os.environ.get("BUILD_TAG"):
             config.labels.update({"jenkins-job": os.environ["BUILD_TAG"]})
-        config.ip = config.ip or DEFAULT_IP
 
         container, port = self.adcm_container_from_config(config)
 
