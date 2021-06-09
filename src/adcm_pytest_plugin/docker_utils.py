@@ -18,7 +18,9 @@ import socket
 import string
 import tarfile
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from gzip import compress
+from typing import Optional
 
 import allure
 import docker
@@ -30,6 +32,7 @@ from coreapi.exceptions import ErrorMessage
 from deprecated import deprecated
 from docker import DockerClient
 from docker.errors import APIError, ImageNotFound
+from docker.models.containers import Container
 from retry.api import retry_call
 
 from .utils import random_string
@@ -201,17 +204,15 @@ class ADCMInitializer:
 
     def init_adcm(self):
         dw = DockerWrapper(dc=self.dc)
+        config = ContainerConfig(remove=False, pull=self.pull)
         # Check if we use remote dockerd
         if self.dc and "localhost" not in self.dc.api.base_url:
             # dc.api.base_url is most likely tcp://{cmd_opts.remote_docker}
             base_url = self.dc.api.base_url
             ip_start = base_url.rfind("/") + 1
             ip_end = base_url.rfind(":")
-            ip = base_url[ip_start:ip_end]
-        else:
-            # then dc.api.base_url is most likely http+docker://localhost
-            ip = None
-        self._adcm = dw.run_adcm(image=self.adcm_repo, tag=self.adcm_tag, remove=False, pull=self.pull, ip=ip)
+            config.ip = base_url[ip_start:ip_end]
+        self._adcm = dw.run_adcm(config)
         # Pre-upload bundles to ADCM before image initialization
         self._preupload_bundles()
         # Create a snapshot from initialized container
@@ -283,16 +284,31 @@ def _wait_for_adcm_container_init(container, container_ip, port, timeout=120):
         raise TimeoutError(f"ADCM API has not responded in {timeout} seconds{additional_message}")
 
 
+@dataclass
+class ContainerConfig:
+    """Dataclass for incapsulating docker container run options"""
+
+    image: str = "hub.arenadata.io/adcm/adcm"
+    tag: str = "latest"
+    pull: bool = True
+    ip: str = DEFAULT_IP
+    labels: dict = field(default_factory=dict)
+    remove: bool = True
+    volumes: Optional[dict] = None
+    name: Optional[str] = None
+
+
 class ADCM:
     """
     Class that wraps ADCM Api operation over self.api (ADCMApiWrapper)
     and wraps docker over self.container (see docker module for info)
     """
 
-    __slots__ = ("container", "ip", "port", "url", "api")
+    __slots__ = ("container", "config", "ip", "port", "url", "api")
 
-    def __init__(self, container, ip, port):
+    def __init__(self, container: Container, ip: str, port: str, config: ContainerConfig):
         self.container = container
+        self.config = config
         self.ip = ip
         self.port = port
         self.url = "http://{}:{}".format(self.ip, self.port)
@@ -312,17 +328,7 @@ class DockerWrapper:
         self.client = dc if dc else docker.DockerClient(base_url=base_url, timeout=120)
 
     # pylint: disable=R0913
-    def run_adcm(
-        self,
-        image=None,
-        labels=None,
-        remove=True,
-        pull=True,
-        name=None,
-        tag=None,
-        ip=None,
-        volumes=None,
-    ):
+    def run_adcm(self, config: ContainerConfig):
         """
         Run ADCM in docker image.
         Return ADCM instance.
@@ -332,67 +338,40 @@ class DockerWrapper:
 
         If tag is None or is not present than a tag 'latest' will be used
         """
-        if not image:
-            image = "hub.arenadata.io/adcm/adcm"
-        if not tag:
-            tag = "latest"
-        if pull:
-            self.client.images.pull(image, tag)
+        if config.pull:
+            self.client.images.pull(config.image, config.tag)
         if os.environ.get("BUILD_TAG"):
-            if not labels:
-                labels = {}
-            labels.update({"jenkins-job": os.environ["BUILD_TAG"]})
-        if not ip:
-            ip = DEFAULT_IP
+            config.labels.update({"jenkins-job": os.environ["BUILD_TAG"]})
 
-        container, port = self.adcm_container(
-            image=image,
-            labels=labels,
-            remove=remove,
-            name=name,
-            tag=tag,
-            ip=ip,
-            volumes=volumes,
-        )
+        container, port = self.adcm_container(config)
 
         # If test runner is running in docker then 127.0.0.1
         # will be local container loop interface instead of host loop interface,
         # so we need to establish ADCM API connection using internal docker network
-        if ip == DEFAULT_IP and is_docker():
-            container_ip = self.client.api.inspect_container(container.id)["NetworkSettings"]["IPAddress"]
+        if config.ip == DEFAULT_IP and is_docker():
+            config.ip = self.client.api.inspect_container(container.id)["NetworkSettings"]["IPAddress"]
             port = "8000"
-        else:
-            container_ip = ip
-        _wait_for_adcm_container_init(container, container_ip, port)
-        return ADCM(container, container_ip, port)
+        _wait_for_adcm_container_init(container, config.ip, port)
+        return ADCM(container, config.ip, port, config)
 
     # pylint: disable=R0913
-    @allure.step("Run ADCM container from the image {image}:{tag}")
-    def adcm_container(
-        self,
-        image=None,
-        labels=None,
-        remove=True,
-        name=None,
-        tag=None,
-        ip=None,
-        volumes=None,
-    ):
+    @allure.step("Run ADCM container")
+    def adcm_container(self, config: ContainerConfig):
         """
         Run ADCM in docker image.
         Return ADCM container and bind port.
         """
-        port = _find_port(ip)
+        port = _find_port(config.ip)
         for _ in range(0, CONTAINER_START_RETRY_COUNT):
             try:
                 container = self.client.containers.run(
-                    "{}:{}".format(image, tag),
-                    ports={"8000": (ip, port)},
-                    volumes=volumes,
-                    remove=remove,
+                    "{}:{}".format(config.image, config.tag),
+                    ports={"8000": (config.ip, port)},
+                    volumes=config.volumes,
+                    remove=config.remove,
+                    labels=config.labels,
+                    name=config.name,
                     detach=True,
-                    labels=labels,
-                    name=name,
                 )
                 break
             except APIError as err:
@@ -403,12 +382,12 @@ class DockerWrapper:
                     # such error excepting leaves created container and there is
                     # no way to clean it other than from docker library
                     # try to find next one port
-                    port = _find_port(ip, port + 1)
+                    port = _find_port(config.ip, port + 1)
                 else:
                     raise err
         else:
             raise RetryCountExceeded(f"Unable to start container after {CONTAINER_START_RETRY_COUNT} retries")
-        with allure.step(f"ADCM API started on {ip}:{port}/api/v1"):
+        with allure.step(f"ADCM API started on {config.ip}:{port}/api/v1"):
             return container, port
 
 
