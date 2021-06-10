@@ -207,7 +207,7 @@ class ADCMInitializer:
 
     def init_adcm(self):
         dw = DockerWrapper(dc=self.dc)
-        config = ContainerConfig(image=self.adcm_repo, tag=self.adcm_tag, remove=False, pull=self.pull)
+        config = ContainerConfig(image=self.adcm_repo, tag=self.adcm_tag, remove=False, pull=self.pull, volumes={})
         # Check if we use remote dockerd
         if self.dc and "localhost" not in self.dc.api.base_url:
             # dc.api.base_url is most likely tcp://{cmd_opts.remote_docker}
@@ -386,7 +386,7 @@ class DockerWrapper:
             self.client.images.pull(config.image, config.tag)
         if os.environ.get("BUILD_TAG"):
             config.labels.update({"jenkins-job": os.environ["BUILD_TAG"]})
-        if not config.volumes:
+        if config.volumes is None:
             volume_name = str(uuid.uuid4())
             self._add_volume(volume_name, config)
 
