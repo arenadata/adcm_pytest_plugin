@@ -12,6 +12,7 @@
 
 import socket
 import time
+import uuid
 from contextlib import suppress
 from typing import Generator, Optional
 
@@ -25,6 +26,7 @@ from adcm_client.objects import ADCMClient
 from allure_commons.reporter import AllureReporter
 from allure_commons.utils import uuid4
 from allure_pytest.listener import AllureListener
+from docker.errors import NotFound
 from requests.exceptions import ReadTimeout as DockerReadTimeout
 
 from .docker_utils import (
@@ -141,6 +143,8 @@ def _adcm(image, cmd_opts, request, adcm_api_credentials) -> Generator[ADCM, Non
                     "Try running container with pytest with --net=host option"
                 )
     config = ContainerConfig(image=repo, tag=tag, pull=False, ip=ip, labels=labels)
+    volume_name = str(uuid.uuid4())
+    volume = dw.add_volume(volume_name, config)
     adcm = dw.run_adcm_from_config(config)
 
     yield adcm
@@ -161,6 +165,9 @@ def _adcm(image, cmd_opts, request, adcm_api_credentials) -> Generator[ADCM, Non
 
     with suppress(DockerReadTimeout):
         adcm.container.kill()
+    with suppress(NotFound):
+        adcm.container.wait(condition="removed", timeout=30)
+    volume.remove()
 
 
 def _allure_reporter(config) -> Optional[AllureReporter]:

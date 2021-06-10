@@ -17,12 +17,13 @@ import re
 import socket
 import string
 import tarfile
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from gzip import compress
 from typing import Optional, Tuple
 
 import allure
+from allure_commons.types import AttachmentType
 import docker
 import pytest
 from adcm_client.objects import ADCMClient
@@ -31,8 +32,9 @@ from adcm_client.wrappers.api import ADCMApiWrapper
 from coreapi.exceptions import ErrorMessage
 from deprecated import deprecated
 from docker import DockerClient
-from docker.errors import APIError, ImageNotFound
+from docker.errors import APIError, ImageNotFound, NotFound
 from docker.models.containers import Container
+from docker.models.volumes import Volume
 from retry.api import retry_call
 
 from .utils import random_string
@@ -422,6 +424,7 @@ class DockerWrapper:
         Return ADCM container and bind port.
         """
         with allure.step(f"Run ADCM container from {config.image}:{config.tag}"):
+            allure.attach(repr(config), name="Container config", attachment_type=AttachmentType.TEXT)
             container, port = self._run_container_on_free_port(config)
         with allure.step(f"ADCM API started on {config.ip}:{port}/api/v1"):
             return container, port
@@ -453,6 +456,13 @@ class DockerWrapper:
                     raise err
         raise RetryCountExceeded(f"Unable to start container after {CONTAINER_START_RETRY_COUNT} retries")
 
+    def add_volume(self, name: str, config: ContainerConfig) -> Volume:
+        """Create named volume and add mountpoint to the given config"""
+        assert not config.volumes, "only one volume allowed"
+        volume = self.client.volumes.create(name=name)
+        config.volumes = {name: {"bind": "/adcm/data", "mode": "rw"}}
+        return volume
+
 
 def remove_docker_image(repo: str, tag: str, dc: DockerClient):
     """Remove docker image"""
@@ -469,3 +479,10 @@ def remove_docker_image(repo: str, tag: str, dc: DockerClient):
         fkwargs={"force": True},
         tries=5,
     )
+
+
+def remove_container_volumes(container: Container, dc: DockerClient):
+    """Remove volumes related to the given container"""
+    for name in [mount["Name"] for mount in container.attrs["Mounts"] if mount["Type"] == "volume"]:
+        with suppress(NotFound):  # volume may be removed already
+            dc.volumes.get(name).remove()
