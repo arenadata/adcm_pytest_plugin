@@ -470,6 +470,7 @@ class DockerWrapper:
                     raise err
         raise RetryCountExceeded(f"Unable to start container after {CONTAINER_START_RETRY_COUNT} retries")
 
+
 def remove_docker_image(repo: str, tag: str, dc: DockerClient):
     """Remove docker image"""
     image_name = f"{repo}:{tag}"
