@@ -207,7 +207,7 @@ class ADCMInitializer:
 
     def init_adcm(self):
         dw = DockerWrapper(dc=self.dc)
-        config = ContainerConfig(remove=False, pull=self.pull)
+        config = ContainerConfig(image=self.adcm_repo, tag=self.adcm_tag, remove=False, pull=self.pull)
         # Check if we use remote dockerd
         if self.dc and "localhost" not in self.dc.api.base_url:
             # dc.api.base_url is most likely tcp://{cmd_opts.remote_docker}
@@ -291,8 +291,8 @@ def _wait_for_adcm_container_init(container, container_ip, port, timeout=120):
 class ContainerConfig:
     """Dataclass for incapsulating docker container run options"""
 
-    image: str = "hub.arenadata.io/adcm/adcm"
-    tag: str = "latest"
+    image: Optional[str] = None
+    tag: Optional[str] = None
     pull: bool = True
     remove: bool = True
     labels: Optional[dict] = None
@@ -303,6 +303,8 @@ class ContainerConfig:
     def __post_init__(self):
         """Default values for some fields overwritten by None,
         therefore we have to init them with expected defaults."""
+        self.image = self.image or "hub.arenadata.io/adcm/adcm"
+        self.tag = self.tag or "latest"
         self.ip = self.ip or DEFAULT_IP
         self.labels = self.labels or {}
 
