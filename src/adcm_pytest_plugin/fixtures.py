@@ -12,7 +12,6 @@
 
 import socket
 import time
-import uuid
 from contextlib import suppress
 from typing import Generator, Optional
 
@@ -36,6 +35,7 @@ from .docker_utils import (
     DockerWrapper,
     gather_adcm_data_from_container,
     is_docker,
+    remove_container_volumes,
     remove_docker_image,
     split_tag,
 )
@@ -143,8 +143,6 @@ def _adcm(image, cmd_opts, request, adcm_api_credentials) -> Generator[ADCM, Non
                     "Try running container with pytest with --net=host option"
                 )
     config = ContainerConfig(image=repo, tag=tag, pull=False, ip=ip, labels=labels)
-    volume_name = str(uuid.uuid4())
-    volume = dw.add_volume(volume_name, config)
     adcm = dw.run_adcm_from_config(config)
 
     yield adcm
@@ -167,7 +165,7 @@ def _adcm(image, cmd_opts, request, adcm_api_credentials) -> Generator[ADCM, Non
         adcm.container.kill()
     with suppress(NotFound):
         adcm.container.wait(condition="removed", timeout=30)
-    volume.remove()
+    remove_container_volumes(adcm.container, dw.client)
 
 
 def _allure_reporter(config) -> Optional[AllureReporter]:
