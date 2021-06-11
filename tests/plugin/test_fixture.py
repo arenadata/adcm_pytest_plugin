@@ -15,12 +15,9 @@ Tests for plugin fixtures.
 Does not contain tests with 'remote_executor_host', 'remote_docker', 'nopull' cmd opts
 WARNING: don't run this test with xdist!!!
 """
-from contextlib import suppress
-
 import allure
 import docker
-from adcm_pytest_plugin.docker_utils import remove_container_volumes
-from docker.errors import NotFound
+
 from requests.exceptions import ReadTimeout as DockerReadTimeout
 from tests.plugin.common import run_tests
 
@@ -114,15 +111,13 @@ def test_fixture_adcm_dontstop(testdir):
         if "test_fixture_adcm_dontstop.py::test_run_adcm" in line:
             line = line.split("'")
             repo_with_tag = ":".join([line[1], line[3]])
-    client = docker.from_env()
-    container_list = client.containers.list(filters=dict(ancestor=repo_with_tag))
+    container_list = docker.from_env().containers.list(filters=dict(ancestor=repo_with_tag))
 
     assert len(container_list) == 1, f"Not found running or created container with '{repo_with_tag}' ancestor"
 
     # Stop and remove ADCM container after test
     for container in container_list:
-        with suppress(DockerReadTimeout):
+        try:
             container.kill()
-        with suppress(NotFound):
-            container.wait(condition="removed", timeout=30)
-        remove_container_volumes(container, client)
+        except DockerReadTimeout:
+            pass
