@@ -25,7 +25,6 @@ from adcm_client.objects import ADCMClient
 from allure_commons.reporter import AllureReporter
 from allure_commons.utils import uuid4
 from allure_pytest.listener import AllureListener
-from docker.errors import NotFound
 from requests.exceptions import ReadTimeout as DockerReadTimeout
 
 from .docker_utils import (
@@ -35,7 +34,6 @@ from .docker_utils import (
     DockerWrapper,
     gather_adcm_data_from_container,
     is_docker,
-    remove_container_volumes,
     remove_docker_image,
     split_tag,
 )
@@ -163,9 +161,6 @@ def _adcm(image, cmd_opts, request, adcm_api_credentials) -> Generator[ADCM, Non
 
     with suppress(DockerReadTimeout):
         adcm.container.kill()
-    with suppress(NotFound):
-        adcm.container.wait(condition="removed", timeout=30)
-    remove_container_volumes(adcm.container, dw.client)
 
 
 def _allure_reporter(config) -> Optional[AllureReporter]:
