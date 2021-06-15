@@ -35,6 +35,7 @@ from .docker_utils import (
     DockerWrapper,
     gather_adcm_data_from_container,
     is_docker,
+    remove_container_volumes,
     remove_docker_image,
     split_tag,
 )
@@ -168,7 +169,9 @@ def _adcm(image, cmd_opts, request, adcm_api_credentials, upgradable=False) -> G
     _remove_hosts(ADCMClient(url=adcm.url, **adcm_api_credentials))
 
     with suppress(DockerReadTimeout):
-        adcm.container.kill()
+        adcm.stop()
+
+    remove_container_volumes(adcm.container, dw.client)
 
 
 def _allure_reporter(config) -> Optional[AllureReporter]:

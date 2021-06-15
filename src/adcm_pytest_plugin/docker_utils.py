@@ -342,7 +342,7 @@ class ADCM:
         volume_name = list(self.container_config.volumes.keys()).pop()
         volume = self.container_config.volumes.get(volume_name)
         with allure.step("Copy /adcm/data to folder attached by volume"):
-            self.container.exec_run(f"rsync -raAXH /adcm/data/ {volume['bind']}")
+            self.container.exec_run(f"sh -c 'cp -a /adcm/data/* {volume['bind']}'")
         with allure.step("Update container config"):
             self.container_config.image = image
             self.container_config.tag = tag
@@ -512,3 +512,11 @@ def remove_docker_image(repo: str, tag: str, dc: DockerClient):
         fkwargs={"force": True},
         tries=5,
     )
+
+
+def remove_container_volumes(container: Container, dc: DockerClient):
+    """Remove volumes related to the given container.
+    Note that container should be removed before function call."""
+    for name in [mount["Name"] for mount in container.attrs["Mounts"] if mount["Type"] == "volume"]:
+        with suppress(NotFound):  # volume may be removed already
+            dc.volumes.get(name).remove()
