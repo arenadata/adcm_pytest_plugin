@@ -336,6 +336,7 @@ class ADCM:
     @allure.step("Upgrade adcm to {target}")
     def upgrade(self, target: Tuple[str, str]) -> None:
         image, tag = target
+        assert self.container_config.volumes, "has no volume to move data"
         volume_name = list(self.container_config.volumes.keys()).pop()
         volume = self.container_config.volumes.get(volume_name)
         with allure.step("Copy /adcm/data to folder attached by volume"):
