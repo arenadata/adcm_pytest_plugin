@@ -336,7 +336,9 @@ class ADCM:
     @allure.step("Upgrade adcm to {target}")
     def upgrade(self, target: Tuple[str, str]) -> None:
         image, tag = target
-        assert self.container_config.volumes, "has no volume to move data"
+        assert (
+            self.container_config.volumes
+        ), "There is no volume to move data. Make sure you are using the correct ADCM fixture for upgrade"
         volume_name = list(self.container_config.volumes.keys()).pop()
         volume = self.container_config.volumes.get(volume_name)
         with allure.step("Copy /adcm/data to folder attached by volume"):
@@ -350,8 +352,9 @@ class ADCM:
                 name="Container config for upgrade",
                 attachment_type=AttachmentType.JSON,
             )
-        with allure.step("Start newer adcm"):
+        with allure.step("Stop old container"):
             self.stop()
+        with allure.step("Start newer adcm"):
             dw = DockerWrapper(base_url=self.container_config.docker_url)
             container, _ = dw.adcm_container_from_config(self.container_config)
             _wait_for_adcm_container_init(container, self.ip, self.port, timeout=30)
