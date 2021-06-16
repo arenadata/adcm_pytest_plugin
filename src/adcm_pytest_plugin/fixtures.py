@@ -12,6 +12,7 @@
 
 import socket
 import time
+import uuid
 from contextlib import suppress
 from typing import Generator, Optional
 
@@ -34,6 +35,7 @@ from .docker_utils import (
     DockerWrapper,
     gather_adcm_data_from_container,
     is_docker,
+    remove_container_volumes,
     remove_docker_image,
     split_tag,
 )
@@ -123,11 +125,13 @@ def image(request, cmd_opts, adcm_api_credentials):
     remove_docker_image(**init_image, dc=dc)
 
 
-def _adcm(image, cmd_opts, request, adcm_api_credentials) -> Generator[ADCM, None, None]:
+def _adcm(image, cmd_opts, request, adcm_api_credentials, upgradable=False) -> Generator[ADCM, None, None]:
     repo, tag = image
     labels = {"pytest_node_id": request.node.nodeid}
+    docker_url = None
     if cmd_opts.remote_docker:
-        dw = DockerWrapper(base_url=f"tcp://{cmd_opts.remote_docker}")
+        docker_url = f"tcp://{cmd_opts.remote_docker}"
+        dw = DockerWrapper(base_url=docker_url)
         ip = cmd_opts.remote_docker.split(":")[0]
     else:
         dw = DockerWrapper()
@@ -140,8 +144,13 @@ def _adcm(image, cmd_opts, request, adcm_api_credentials) -> Generator[ADCM, Non
                     "There is no obvious way to get external ip in this case."
                     "Try running container with pytest with --net=host option"
                 )
-    config = ContainerConfig(image=repo, tag=tag, pull=False, ip=ip, labels=labels)
-    adcm = dw.run_adcm_from_config(config)
+    volumes = {}
+    if upgradable:
+        volume_name = str(uuid.uuid4())[-12:]
+        volumes.update({volume_name: {"bind": "/adcm/shadow", "mode": "rw"}})
+    adcm = dw.run_adcm_from_config(
+        ContainerConfig(image=repo, tag=tag, pull=False, ip=ip, labels=labels, volumes=volumes, docker_url=docker_url)
+    )
 
     yield adcm
 
@@ -160,7 +169,9 @@ def _adcm(image, cmd_opts, request, adcm_api_credentials) -> Generator[ADCM, Non
     _remove_hosts(ADCMClient(url=adcm.url, **adcm_api_credentials))
 
     with suppress(DockerReadTimeout):
-        adcm.container.kill()
+        adcm.stop()
+
+    remove_container_volumes(adcm.container, dw.client)
 
 
 def _allure_reporter(config) -> Optional[AllureReporter]:

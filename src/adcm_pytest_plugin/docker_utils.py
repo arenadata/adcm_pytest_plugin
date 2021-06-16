@@ -12,13 +12,14 @@
 
 # pylint: disable=redefined-outer-name, C0103, E0401
 import io
+import json
 import os
 import re
 import socket
 import string
 import tarfile
-from contextlib import contextmanager
-from dataclasses import dataclass
+from contextlib import contextmanager, suppress
+from dataclasses import asdict, dataclass
 from gzip import compress
 from typing import Optional, Tuple
 
@@ -28,10 +29,11 @@ import pytest
 from adcm_client.objects import ADCMClient
 from adcm_client.util.wait import wait_for_url
 from adcm_client.wrappers.api import ADCMApiWrapper
+from allure_commons.types import AttachmentType
 from coreapi.exceptions import ErrorMessage
 from deprecated import deprecated
 from docker import DockerClient
-from docker.errors import APIError, ImageNotFound
+from docker.errors import APIError, ImageNotFound, NotFound
 from docker.models.containers import Container
 from retry.api import retry_call
 
@@ -294,8 +296,10 @@ class ContainerConfig:
     remove: bool = True
     labels: Optional[dict] = None
     ip: Optional[str] = None
+    port: Optional[int] = None
     volumes: Optional[dict] = None
     name: Optional[str] = None
+    docker_url: Optional[str] = None
 
     def __post_init__(self):
         """Default values for some fields overwritten by None,
@@ -325,6 +329,36 @@ class ADCM:
     def stop(self):
         """Stops container"""
         self.container.stop()
+        with suppress(NotFound):
+            condition = "removed" if self.container.attrs["HostConfig"]["AutoRemove"] else "stopped"
+            self.container.wait(condition=condition, timeout=30)
+
+    @allure.step("Upgrade adcm to {target}")
+    def upgrade(self, target: Tuple[str, str]) -> None:
+        image, tag = target
+        assert (
+            self.container_config.volumes
+        ), "There is no volume to move data. Make sure you are using the correct ADCM fixture for upgrade"
+        volume_name = list(self.container_config.volumes.keys()).pop()
+        volume = self.container_config.volumes.get(volume_name)
+        with allure.step("Copy /adcm/data to folder attached by volume"):
+            self.container.exec_run(f"sh -c 'cp -a /adcm/data/* {volume['bind']}'")
+        with allure.step("Update container config"):
+            self.container_config.image = image
+            self.container_config.tag = tag
+            volume.update({"bind": "/adcm/data"})
+            allure.attach(
+                json.dumps(asdict(self.container_config), indent=2),  # config object is not serializable
+                name="Container config for upgrade",
+                attachment_type=AttachmentType.JSON,
+            )
+        with allure.step("Stop old container"):
+            self.stop()
+        with allure.step("Start newer adcm"):
+            dw = DockerWrapper(base_url=self.container_config.docker_url)
+            container, _ = dw.adcm_container_from_config(self.container_config)
+            _wait_for_adcm_container_init(container, self.ip, self.port, timeout=30)
+            self.container = container
 
 
 class DockerWrapper:
@@ -424,24 +458,20 @@ class DockerWrapper:
         Return ADCM container and bind port.
         """
         with allure.step(f"Run ADCM container from {config.image}:{config.tag}"):
-            container, port = self._run_container_on_free_port(config)
-        with allure.step(f"ADCM API started on {config.ip}:{port}/api/v1"):
-            return container, port
+            allure.attach(
+                json.dumps(asdict(config), indent=2),  # config object is not serializable
+                name="Container config",
+                attachment_type=AttachmentType.JSON,
+            )
+            container = self._run_container(config) if config.port else self._run_container_on_free_port(config)
+        with allure.step(f"ADCM API started on {config.ip}:{config.port}/api/v1"):
+            return container, config.port
 
-    def _run_container_on_free_port(self, config: ContainerConfig) -> Tuple[Container, int]:
-        port = _find_port(config.ip)
+    def _run_container_on_free_port(self, config: ContainerConfig) -> Container:
+        config.port = _find_port(config.ip)
         for _ in range(0, CONTAINER_START_RETRY_COUNT):
             try:
-                container = self.client.containers.run(
-                    "{}:{}".format(config.image, config.tag),
-                    ports={"8000": (config.ip, port)},
-                    volumes=config.volumes,
-                    remove=config.remove,
-                    labels=config.labels,
-                    name=config.name,
-                    detach=True,
-                )
-                return container, port
+                return self._run_container(config)
             except APIError as err:
                 if (
                     "failed: port is already allocated" in err.explanation
@@ -450,10 +480,21 @@ class DockerWrapper:
                     # such error excepting leaves created container and there is
                     # no way to clean it other than from docker library
                     # try to find next one port
-                    port = _find_port(config.ip, port + 1)
+                    config.port = _find_port(config.ip, config.port + 1)
                 else:
                     raise err
         raise RetryCountExceeded(f"Unable to start container after {CONTAINER_START_RETRY_COUNT} retries")
+
+    def _run_container(self, config: ContainerConfig) -> Container:
+        return self.client.containers.run(
+            "{}:{}".format(config.image, config.tag),
+            ports={"8000": (config.ip, config.port)},
+            volumes=config.volumes,
+            remove=config.remove,
+            labels=config.labels,
+            name=config.name,
+            detach=True,
+        )
 
 
 def remove_docker_image(repo: str, tag: str, dc: DockerClient):
@@ -471,3 +512,11 @@ def remove_docker_image(repo: str, tag: str, dc: DockerClient):
         fkwargs={"force": True},
         tries=5,
     )
+
+
+def remove_container_volumes(container: Container, dc: DockerClient):
+    """Remove volumes related to the given container.
+    Note that container should be removed before function call."""
+    for name in [mount["Name"] for mount in container.attrs["Mounts"] if mount["Type"] == "volume"]:
+        with suppress(NotFound):  # volume may be removed already
+            dc.volumes.get(name).remove()
