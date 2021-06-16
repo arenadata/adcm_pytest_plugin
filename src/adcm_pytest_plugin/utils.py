@@ -13,9 +13,10 @@
 import os
 import random
 import string
+from contextlib import AbstractContextManager
 from time import time, sleep
 
-from typing import List, Iterable, Tuple, Union
+from typing import List, Iterable, Tuple, Union, Type
 
 import allure
 import pytest
@@ -386,3 +387,29 @@ def wait_until_step_succeeds(func, timeout: Union[int, float] = 300, period: Uni
             raise AssertionError(
                 f'Step "{func.__name__}" failed after retrying {timeout} seconds. ' f"The last error was: {last_error}"
             )
+
+
+class catch_failed(AbstractContextManager):
+    """
+    ContextManager to catch some errors and raise AssertionError with the given message.
+    >>> class SomeException(Exception):
+    ...     pass
+    >>> with catch_failed(SomeException, "Oops!"):
+    ...     raise SomeException("Inner exception")
+    Traceback (most recent call last):
+        ...
+    AssertionError: Oops!
+    """
+
+    __tracebackhide__ = True
+
+    def __init__(self, exctype: Type[Exception], msg: str):
+        self._msg = msg
+        self._exctype = exctype
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exctype, excinst, exctb):
+        if exctype is not None and issubclass(exctype, self._exctype):
+            raise AssertionError(self._msg) from excinst
