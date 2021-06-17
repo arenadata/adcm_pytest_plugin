@@ -78,7 +78,7 @@ def test_fixture_image_staticimage(testdir):
     """
     run_tests(
         testdir,
-        py_file=create_image_py_file,
+        makepyfile_str=create_image_py_file,
         additional_opts=[f"--staticimage={custom_image_name}"],
     )
 
@@ -105,7 +105,7 @@ def test_fixture_adcm_dontstop(testdir):
         # For teardown testing. This is needed to transfer result of executing fixture to outside.
         print((repo_name, tag))
     """
-    result = run_tests(testdir, py_file=run_adcm_py_file, additional_opts=["--dontstop"])
+    result = run_tests(testdir, makepyfile_str=run_adcm_py_file, additional_opts=["--dontstop"])
     repo_with_tag = ""
     for line in result.outlines:
         if "test_fixture_adcm_dontstop.py::test_run_adcm" in line:
