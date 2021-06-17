@@ -17,7 +17,9 @@ WARNING: don't run this test with xdist!!!
 """
 import allure
 import docker
+import pytest
 
+from contextlib import suppress
 from requests.exceptions import ReadTimeout as DockerReadTimeout
 from tests.plugin.common import run_tests
 
@@ -25,56 +27,40 @@ pytestmark = [allure.suite("Plugin fixtures")]
 
 
 def test_fixture_image(testdir):
-    """
-    Test image creating by fixture from plugin
-    """
-    result = run_tests(testdir, "test_image.py")
-
+    """Test image creating by fixture from plugin"""
+    run_tests(testdir, "test_image.py")
+    assert pytest.pytester_tmp, "Test has no return."
+    output = pytest.pytester_tmp.pop()
+    repo_with_tag = ":".join(output)
     # Asserts fixture teardown
-    repo_with_tag = ""
-    for line in result.outlines:
-        if "test_image.py::test_image" in line:
-            line = line.split("'")
-            repo_with_tag = ":".join([line[1], line[3]])
     assert (
         len(docker.from_env().images.list(name=repo_with_tag)) == 0
     ), f"Found created image with '{repo_with_tag}' name"
 
 
 def test_fixture_adcm(testdir):
-    """
-    Test ADCM running by fixture from plugin
-    """
-    result = run_tests(testdir, "test_adcm.py")
-
+    """Test ADCM running by fixture from plugin"""
+    run_tests(testdir, "test_adcm.py")
+    assert pytest.pytester_tmp, "Test has no return."
+    output = pytest.pytester_tmp.pop()
+    repo_with_tag = ":".join(output)
     # Asserts fixture teardown
-    repo_with_tag = ""
-    for line in result.outlines:
-        if "test_adcm.py::test_adcm" in line:
-            line = line.split("'")
-            repo_with_tag = ":".join([line[1], line[3]])
     assert (
         len(docker.from_env().containers.list(filters=dict(ancestor=repo_with_tag), all=True)) == 0
     ), f"Found running or created container with '{repo_with_tag}' ancestor"
 
 
 def test_fixture_sdk_client(testdir):
-    """
-    Test creating SDKClient object creating by fixture from plugin
-    """
+    """Test creating SDKClient object creating by fixture from plugin"""
     run_tests(testdir, "test_sdk_client.py")
 
 
 def test_fixture_image_staticimage(testdir):
-    """
-    Test image creating by fixture from plugin with 'staticimage' cmd opt
-    """
+    """Test image creating by fixture from plugin with 'staticimage' cmd opt"""
     custom_image_name = "test_repo/test_image:test_tag"
     create_image_py_file = """
     def test_create_image(image):
-        repo_name, tag = image
-        # For teardown testing. This is needed to transfer result of executing fixture to outside.
-        print((repo_name, tag))
+        pass
     """
     run_tests(
         testdir,
@@ -87,37 +73,31 @@ def test_fixture_image_staticimage(testdir):
 
     # Remove created static image after test
     for container in client.containers.list(filters=dict(ancestor=custom_image_name)):
-        try:
+        # https://github.com/docker/docker-py/issues/1966 workaround
+        with suppress(ConnectionError):
             container.wait(condition="removed", timeout=30)
-        except ConnectionError:
-            # https://github.com/docker/docker-py/issues/1966 workaround
-            pass
     client.images.remove(custom_image_name, force=True)
 
 
 def test_fixture_adcm_dontstop(testdir):
-    """
-    Test ADCM running by fixture from plugin with 'dontstop' cmd opt
-    """
+    """Test ADCM running by fixture from plugin with 'dontstop' cmd opt"""
     run_adcm_py_file = """
+    import pytest
+
     def test_run_adcm(image, adcm_fs):
         repo_name, tag = image
         # For teardown testing. This is needed to transfer result of executing fixture to outside.
-        print((repo_name, tag))
+        pytest.pytester_tmp.append((repo_name, tag))
     """
-    result = run_tests(testdir, makepyfile_str=run_adcm_py_file, additional_opts=["--dontstop"])
-    repo_with_tag = ""
-    for line in result.outlines:
-        if "test_fixture_adcm_dontstop.py::test_run_adcm" in line:
-            line = line.split("'")
-            repo_with_tag = ":".join([line[1], line[3]])
+    run_tests(testdir, makepyfile_str=run_adcm_py_file, additional_opts=["--dontstop"])
+    assert pytest.pytester_tmp, "Test has no return."
+    output = pytest.pytester_tmp.pop()
+    repo_with_tag = ":".join(output)
     container_list = docker.from_env().containers.list(filters=dict(ancestor=repo_with_tag))
 
     assert len(container_list) == 1, f"Not found running or created container with '{repo_with_tag}' ancestor"
 
     # Stop and remove ADCM container after test
     for container in container_list:
-        try:
+        with suppress(DockerReadTimeout):
             container.kill()
-        except DockerReadTimeout:
-            pass

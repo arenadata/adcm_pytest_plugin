@@ -16,6 +16,7 @@ WARNING: this file only for run in 'testdir.runpytest'
 from datetime import datetime
 
 import docker
+import pytest
 
 test_start_time = datetime.now().timestamp()
 
@@ -38,4 +39,5 @@ def test_image(image):
                     created_image_list.append({event["Tags"][0]: str(datetime.fromtimestamp(event["Created"]))})
     assert len(created_image_list) != 0, "Image not created"
     assert len(created_image_list) == 1, "More than 1 image created"
-    print((repo_name, tag))  # For teardown testing. This is needed to transfer result of executing fixture to outside.
+    # For teardown testing. This is needed to transfer result of executing fixture to outside.
+    pytest.pytester_tmp.append((repo_name, tag))

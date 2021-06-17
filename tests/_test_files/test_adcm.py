@@ -24,4 +24,5 @@ def test_adcm(image):
     assert (
         len(docker.from_env().containers.list(filters=dict(ancestor=f"{repo_name}:{tag}"))) == 1
     ), f"Not found running container with '{repo_name}:{tag}' ancestor"
-    print((repo_name, tag))  # For teardown testing. This is needed to transfer result of executing fixture to outside.
+    # For teardown testing. This is needed to transfer result of executing fixture to outside.
+    pytest.pytester_tmp.append((repo_name, tag))

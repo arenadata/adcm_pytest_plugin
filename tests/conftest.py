@@ -10,4 +10,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import pytest
+
 pytest_plugins = ["pytester"]
+
+
+def pytest_configure():
+    # Create container for tests' output
+    pytest.pytester_tmp = []
+
+
+def pytest_runtest_teardown():
+    # Clear test output object list before running new tests
+    pytest.pytester_tmp.clear()
