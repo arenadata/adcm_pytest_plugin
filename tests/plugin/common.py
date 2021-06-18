@@ -20,7 +20,8 @@ def run_tests(
     :param additional_opts: list of additional pytest launch parameters
     :param outcomes: optional outcomes expect. Ex. {"failed":1}
     """
-    assert testfile_path or makepyfile_str, "At least one of the `testfile_path` or `makepyfile_str` should be passed."
+    if not (testfile_path or makepyfile_str):
+        raise ValueError("At least one of the `testfile_path` or `makepyfile_str` should be passed.")
 
     if testfile_path:
         testdir.copy_example(testfile_path)

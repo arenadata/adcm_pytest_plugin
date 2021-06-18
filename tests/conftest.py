@@ -15,11 +15,6 @@ import pytest
 pytest_plugins = ["pytester"]
 
 
-def pytest_configure():
-    # Create container for tests' output
-    pytest.pytester_tmp = []
-
-
-def pytest_runtest_teardown():
-    # Clear test output object list before running new tests
-    pytest.pytester_tmp.clear()
+def pytest_runtest_setup():
+    # Create variable for test return
+    pytest.test_retval = None

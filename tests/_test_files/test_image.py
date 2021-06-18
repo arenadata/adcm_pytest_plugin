@@ -40,4 +40,4 @@ def test_image(image):
     assert len(created_image_list) != 0, "Image not created"
     assert len(created_image_list) == 1, "More than 1 image created"
     # For teardown testing. This is needed to transfer result of executing fixture to outside.
-    pytest.pytester_tmp.append((repo_name, tag))
+    pytest.test_retval = repo_name, tag

@@ -29,9 +29,8 @@ pytestmark = [allure.suite("Plugin fixtures")]
 def test_fixture_image(testdir):
     """Test image creating by fixture from plugin"""
     run_tests(testdir, "test_image.py")
-    assert pytest.pytester_tmp, "Test has no return."
-    output = pytest.pytester_tmp.pop()
-    repo_with_tag = ":".join(output)
+    assert pytest.test_retval, "Test has no return."
+    repo_with_tag = ":".join(pytest.test_retval)
     # Asserts fixture teardown
     assert (
         len(docker.from_env().images.list(name=repo_with_tag)) == 0
@@ -41,9 +40,8 @@ def test_fixture_image(testdir):
 def test_fixture_adcm(testdir):
     """Test ADCM running by fixture from plugin"""
     run_tests(testdir, "test_adcm.py")
-    assert pytest.pytester_tmp, "Test has no return."
-    output = pytest.pytester_tmp.pop()
-    repo_with_tag = ":".join(output)
+    assert pytest.test_retval, "Test has no return."
+    repo_with_tag = ":".join(pytest.test_retval)
     # Asserts fixture teardown
     assert (
         len(docker.from_env().containers.list(filters=dict(ancestor=repo_with_tag), all=True)) == 0
@@ -87,12 +85,11 @@ def test_fixture_adcm_dontstop(testdir):
     def test_run_adcm(image, adcm_fs):
         repo_name, tag = image
         # For teardown testing. This is needed to transfer result of executing fixture to outside.
-        pytest.pytester_tmp.append((repo_name, tag))
+        pytest.test_retval = repo_name, tag
     """
     run_tests(testdir, makepyfile_str=run_adcm_py_file, additional_opts=["--dontstop"])
-    assert pytest.pytester_tmp, "Test has no return."
-    output = pytest.pytester_tmp.pop()
-    repo_with_tag = ":".join(output)
+    assert pytest.test_retval, "Test has no return."
+    repo_with_tag = ":".join(pytest.test_retval)
     container_list = docker.from_env().containers.list(filters=dict(ancestor=repo_with_tag))
 
     assert len(container_list) == 1, f"Not found running or created container with '{repo_with_tag}' ancestor"
