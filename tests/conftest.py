@@ -10,4 +10,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-pytest_plugins = "pytester"
+import pytest
+
+pytest_plugins = ["pytester"]
+
+
+def pytest_runtest_setup():
+    # Create variable for test return
+    pytest.test_retval = None
