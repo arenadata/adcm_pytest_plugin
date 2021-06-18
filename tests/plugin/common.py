@@ -1,6 +1,6 @@
 """Common methods for plugin tests"""
 
-from typing import Optional
+from typing import Mapping, Optional
 
 import allure
 
@@ -10,7 +10,7 @@ def run_tests(
     testfile_path: str = "",
     makepyfile_str: str = "",
     additional_opts: Optional[list] = None,
-    outcomes=None,
+    outcomes: Optional[Mapping] = None,
 ):
     """
     Run tests with pytest parameters from .py file or multiline string
@@ -20,13 +20,12 @@ def run_tests(
     :param additional_opts: list of additional pytest launch parameters
     :param outcomes: optional outcomes expect. Ex. {"failed":1}
     """
-    if not (testfile_path or makepyfile_str):
-        raise ValueError("At least one of the `testfile_path` or `makepyfile_str` should be passed.")
-
     if testfile_path:
         testdir.copy_example(testfile_path)
     elif makepyfile_str:
         testdir.makepyfile(makepyfile_str)
+    else:
+        raise ValueError("At least one of the `testfile_path` or `makepyfile_str` should be passed.")
 
     additional_opts = additional_opts or []
     opts = ["-s", "-v", *additional_opts]
