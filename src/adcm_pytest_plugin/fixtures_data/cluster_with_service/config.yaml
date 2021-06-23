@@ -14,9 +14,9 @@
   name: Dummy cluster
   version: 1.5
   import:
-     Graphite:
+     Dummy cluster to import:
         versions:
-           min: 1.8
+           min: 1.4
            max: 2.5
   config:
     - name: string
@@ -71,7 +71,6 @@
             - name: part2
               script_type: ansible
               script: dummy_action.yaml
-          host_action: true
           states:
             available:
               - created
