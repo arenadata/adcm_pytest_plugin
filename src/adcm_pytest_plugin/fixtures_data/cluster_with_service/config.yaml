@@ -13,6 +13,11 @@
 - type: cluster
   name: Dummy cluster
   version: 1.5
+  import:
+     Graphite:
+        versions:
+           min: 1.8
+           max: 2.5
   config:
     - name: string
       type: string
@@ -33,6 +38,11 @@
   version: 1.5
   components:
     first:
+      config:
+        - name: string
+          type: string
+          required: true
+          default: string
       actions:
         component_first_action:
           type: job
@@ -67,6 +77,11 @@
               - created
 
     second:
+      config:
+        - name: string
+          type: string
+          required: true
+          default: string
       actions:
         switch_component_state:
           type: job
