@@ -312,7 +312,7 @@ def cmd_opts(request):
     return request.config.option
 
 
-@allure.title("ADCM Client with ADCM objects")
+@allure.title("Add dummy objects to ADCM")
 def _sdk_client_with_objects_ss(sdk_client_ss):
     """Returns ADCMClient with ADCM objects"""
     with allure.step("Create provider"):
