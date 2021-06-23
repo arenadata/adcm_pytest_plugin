@@ -27,7 +27,7 @@ from allure_commons.utils import uuid4
 from allure_pytest.listener import AllureListener
 from requests.exceptions import ReadTimeout as DockerReadTimeout
 
-from src.adcm_pytest_plugin import utils
+from adcm_pytest_plugin import utils
 from .docker_utils import (
     ADCM,
     ADCMInitializer,
