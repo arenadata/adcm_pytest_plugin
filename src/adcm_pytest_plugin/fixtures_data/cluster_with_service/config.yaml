@@ -15,9 +15,9 @@
   version: 1.5
   import:
      Dummy cluster to import:
-        versions:
-           min: 1.4
-           max: 2.5
+          versions:
+             max: 3.0
+             min: 2.2
   config:
     - name: string
       type: string
