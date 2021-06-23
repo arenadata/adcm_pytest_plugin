@@ -22,7 +22,6 @@ import pytest
 from _pytest.fixtures import SubRequest
 from adcm_client.base import Paging, WaitTimeout
 from adcm_client.objects import ADCMClient
-from adcm_client.objects import Provider, Cluster
 from allure_commons.reporter import AllureReporter
 from allure_commons.utils import uuid4
 from allure_pytest.listener import AllureListener
@@ -71,17 +70,14 @@ def image(request, cmd_opts, adcm_api_credentials):
     """That fixture creates ADCM container, waits until
     a database becomes initialised and stores that as images
     with random tag and name local/adcminit
-
     That can be useful to use that fixture to make ADCM's
     container startup time shorter.
-
     Operates with cmd-opts:
      '--staticimage INIT_IMAGE'
      '--adcm-image IMAGE'
      '--remote-docker HOST:PORT'
      '--dontstop'
      '--nopull'
-
     Fixture returns list:
     repo, tag
     """
@@ -316,34 +312,28 @@ def cmd_opts(request):
     return request.config.option
 
 
-@allure.title("Create provider")
-@pytest.fixture(scope="session")
-def provider_ss(sdk_client_ss) -> Provider:
-    bundle = sdk_client_ss.upload_from_fs(utils.get_data_dir(__file__, "provider"))
-    return bundle.provider_prototype().provider_create("Some provider")
-
-
-@allure.title("Create a cluster with service")
-@pytest.fixture(scope="session")
-def cluster_with_service_ss(sdk_client_ss) -> Cluster:
-    bundle = sdk_client_ss.upload_from_fs(utils.get_data_dir(__file__, "cluster_with_service"))
-    cluster = bundle.cluster_prototype().cluster_create(name="Cluster with services")
-    return cluster
-
-
 @allure.title("ADCM Client with ADCM objects")
-@pytest.fixture(scope="session")
-def sdk_client_with_objects_ss(cluster_with_service_ss: Cluster, provider_ss: Provider):
+def _sdk_client_with_objects_ss(sdk_client_ss):
     """Returns ADCMClient with ADCM objects"""
-    service_first = cluster_with_service_ss.service_add(name="Dummy service")
-    service_second = cluster_with_service_ss.service_add(name="Second service")
-    host_first = provider_ss.host_create("host_in_cluster")
-    host_second = provider_ss.host_create("host_in_cluster_second")
-    cluster_with_service_ss.host_add(host_first)
-    cluster_with_service_ss.host_add(host_second)
-    cluster_with_service_ss.hostcomponent_set((host_first, service_first.component(name="first")),
-                                              (host_second, service_first.component(name="second")),
-                                              (host_second, service_second.component(name="third")))
-    task = cluster_with_service_ss.action(name="action_on_cluster").run()
-    task.wait()
+    with allure.step("Create provider"):
+        provider_bundle = sdk_client_ss.upload_from_fs(utils.get_data_dir(__file__, "provider"))
+        provider = provider_bundle.provider_prototype().provider_create("Some provider")
+    with allure.step("Create a cluster with service"):
+        cluster_bundle = sdk_client_ss.upload_from_fs(utils.get_data_dir(__file__, "cluster_with_service"))
+        cluster = cluster_bundle.cluster_prototype().cluster_create(name="Cluster with services")
+    with allure.step("Add services"):
+        service_first = cluster.service_add(name="Dummy service")
+        service_second = cluster.service_add(name="Second service")
+    with allure.step("Add hosts"):
+        host_first = provider.host_create("host_in_cluster")
+        host_second = provider.host_create("host_in_cluster_second")
+        cluster.host_add(host_first)
+        cluster.host_add(host_second)
+    with allure.step("Set components"):
+        cluster.hostcomponent_set((host_first, service_first.component(name="first")),
+                                  (host_second, service_first.component(name="second")),
+                                  (host_second, service_second.component(name="third")))
+    with allure.step("Run task"):
+        task = cluster.action(name="action_on_cluster").run()
+        task.wait()
     return sdk_client_ss

@@ -13,12 +13,30 @@
 - type: provider
   name: provider_name
   version: 1.4
+  config:
+    - name: string
+      type: string
+      required: true
+      default: string
   description: "That is description"
+  actions:
+    job:
+      script: provider_action.yaml
+      script_type: ansible
+      type: job
+      states:
+        available:
+          - created
 
 - type: host
   name: host_name
   version: 1.0
   description: "That is description"
+  config:
+    - name: string
+      type: string
+      required: true
+      default: string
   actions:
     switch_host_state:
       type: job
