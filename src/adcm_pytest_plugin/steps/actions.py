@@ -76,7 +76,9 @@ def _extract_error_from_ansible_log(log: str):
         task_name = log.rfind("TASK [", 0, err_start)
         task_marker = log.find("******", err_start)
         err_end = log.rfind("\n", 0, task_marker) + 1
-        return log[task_name:err_start] + log[err_start:err_end]
+        if task_name > -1:
+            err_start = task_name
+        return log[err_start:err_end]
     return ""
 
 
