@@ -313,7 +313,7 @@ def cmd_opts(request):
 
 
 @allure.title("Add dummy objects to ADCM")
-def _sdk_client_with_objects_ss(sdk_client):
+def _add_objects_to_adcm(sdk_client):
     """Returns ADCMClient with ADCM objects"""
     with allure.step("Create provider"):
         provider_bundle = sdk_client_ss.upload_from_fs(utils.get_data_dir(__file__, "provider"))
