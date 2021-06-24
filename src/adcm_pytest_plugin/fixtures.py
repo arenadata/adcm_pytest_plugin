@@ -318,7 +318,7 @@ def _add_objects_to_adcm(sdk_client):
     with allure.step("Create provider"):
         provider_bundle = sdk_client_ss.upload_from_fs(utils.get_data_dir(__file__, "provider"))
         provider = provider_bundle.provider_prototype().provider_create("Some provider")
-    with allure.step("Create to import"):
+    with allure.step("Create cluster for the further import"):
         cluster_to_import_bundle = sdk_client_ss.upload_from_fs(utils.get_data_dir(__file__, "cluster_to_import"))
         cluster_to_import = cluster_to_import_bundle.cluster_prototype().cluster_create(name="Dummy cluster to import")
     with allure.step("Create a cluster with service"):
