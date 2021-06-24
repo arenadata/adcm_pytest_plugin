@@ -50,20 +50,33 @@ def _extract_error_from_ansible_log(log: str):
 
     >>> _extract_error_from_ansible_log("fatal: Some ERROR\\nTASK [api : something] **********")
     'fatal: Some ERROR\\n'
-    >>> _extract_error_from_ansible_log(
-    ...     "TASK [api : something] **********\\nok: [adcm-cluster-adb-gw0-e330benhwqir]\\n msg: All assertions passed"
-    ... )
+    >>> _extract_error_from_ansible_log('''
+    ... TASK [api : something] ***
+    ... datetime **********
+    ... ok: [adcm-cluster-adb-gw0-e330benhwqir]
+    ... msg: All assertions passed"
+    ... ''')
     ''
-    >>> _extract_error_from_ansible_log(
-    ...     "TASK [conf]**********\\nfatal: Some \\n multiline\\nERROR\\nNO MORE HOSTS LEFT *********"
-    ... )
-    'fatal: Some \\n multiline\\nERROR\\n'
+    >>> _extract_error_from_ansible_log('''
+    ... TASK [api : something] ***
+    ... datetime **********
+    ... ok: [adcm-cluster-adb-gw0-e330benhwqir]
+    ... msg: All assertions passed"
+    ...
+    ... TASK [failed task] ***
+    ... datetime *********
+    ... fatal: [fqdn]: FAILED! => changed=false
+    ... msg: Assertion failed
+    ... NO MORE HOSTS LEFT *********
+    ... ''')
+    'TASK [failed task] ***\\ndatetime *********\\nfatal: [fqdn]: FAILED! => changed=false\\nmsg: Assertion failed\\n'
     """
     err_start = log.find("fatal:")
     if err_start > -1:
+        task_name = log.rfind("TASK [", 0, err_start)
         task_marker = log.find("******", err_start)
         err_end = log.rfind("\n", 0, task_marker) + 1
-        return log[err_start:err_end]
+        return log[task_name:err_start] + log[err_start:err_end]
     return ""
 
 
