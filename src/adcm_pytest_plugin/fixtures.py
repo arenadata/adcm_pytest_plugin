@@ -313,7 +313,7 @@ def cmd_opts(request):
 
 
 @allure.title("Add dummy objects to ADCM")
-def _sdk_client_with_objects_ss(sdk_client):
+def _sdk_client_with_objects_ss(sdk_client_ss):
     """Returns ADCMClient with ADCM objects"""
     with allure.step("Create provider"):
         provider_bundle = sdk_client_ss.upload_from_fs(utils.get_data_dir(__file__, "provider"))
@@ -334,9 +334,11 @@ def _sdk_client_with_objects_ss(sdk_client):
         cluster.host_add(host_first)
         cluster.host_add(host_second)
     with allure.step("Set components"):
-        cluster.hostcomponent_set((host_first, service_first.component(name="first")),
-                                  (host_second, service_first.component(name="second")),
-                                  (host_second, service_second.component(name="third")))
+        cluster.hostcomponent_set(
+            (host_first, service_first.component(name="first")),
+            (host_second, service_first.component(name="second")),
+            (host_second, service_second.component(name="third")),
+        )
     with allure.step("Run task"):
         task = cluster.action(name="action_on_cluster").run()
         task.wait()
