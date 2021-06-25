@@ -109,8 +109,8 @@ def test_with_xdist(testdir):
 
     @pytest.mark.parametrize("arg", [*range({gw_count})])
     @pytest.mark.usefixtures("arg")
-    def test_xdist_run(adcm_fs, testrun_uid):
-        pass
+    def test_xdist_run(adcm_fs, adcm_api_credentials):
+        adcm_fs.api.auth(**adcm_api_credentials)
     """
     run_tests(
         testdir,  # keep from black
