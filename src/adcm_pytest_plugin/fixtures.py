@@ -313,16 +313,16 @@ def cmd_opts(request):
 
 
 @allure.title("Add dummy objects to ADCM")
-def _sdk_client_with_objects_ss(sdk_client_ss):
+def _sdk_client_with_objects_ss(sdk_client):
     """Returns ADCMClient with ADCM objects"""
     with allure.step("Create provider"):
-        provider_bundle = sdk_client_ss.upload_from_fs(utils.get_data_dir(__file__, "provider"))
+        provider_bundle = sdk_client.upload_from_fs(utils.get_data_dir(__file__, "provider"))
         provider = provider_bundle.provider_prototype().provider_create("Some provider")
     with allure.step("Create cluster for the further import"):
-        cluster_to_import_bundle = sdk_client_ss.upload_from_fs(utils.get_data_dir(__file__, "cluster_to_import"))
+        cluster_to_import_bundle = sdk_client.upload_from_fs(utils.get_data_dir(__file__, "cluster_to_import"))
         cluster_to_import = cluster_to_import_bundle.cluster_prototype().cluster_create(name="Dummy cluster to import")
     with allure.step("Create a cluster with service"):
-        cluster_bundle = sdk_client_ss.upload_from_fs(utils.get_data_dir(__file__, "cluster_with_service"))
+        cluster_bundle = sdk_client.upload_from_fs(utils.get_data_dir(__file__, "cluster_with_service"))
         cluster = cluster_bundle.cluster_prototype().cluster_create(name="Cluster with services")
         cluster.bind(cluster_to_import)
     with allure.step("Add services"):
@@ -342,4 +342,4 @@ def _sdk_client_with_objects_ss(sdk_client_ss):
     with allure.step("Run task"):
         task = cluster.action(name="action_on_cluster").run()
         task.wait()
-    return sdk_client_ss
+    return sdk_client
