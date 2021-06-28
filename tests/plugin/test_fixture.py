@@ -98,3 +98,24 @@ def test_fixture_adcm_dontstop(testdir):
     for container in container_list:
         with suppress(DockerReadTimeout):
             container.kill()
+
+
+def test_with_xdist(testdir):
+    """Test distributed run of adcm_fs fixture.
+    We cannot check inner test output due to output swallowing."""
+    gw_count = 4
+    test_content = f"""
+    import pytest
+
+    @pytest.mark.parametrize("arg", [*range({gw_count})])
+    @pytest.mark.usefixtures("arg")
+    def test_xdist_run(adcm_fs, adcm_api_credentials):
+        username, password = adcm_api_credentials.values()
+        adcm_fs.api.auth(username, password)
+    """
+    run_tests(
+        testdir,  # keep from black
+        makepyfile_str=test_content,
+        additional_opts=[f"-n {gw_count}"],
+        outcomes=dict(passed=gw_count),
+    )
