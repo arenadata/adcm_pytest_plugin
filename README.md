@@ -336,6 +336,7 @@ To run plugin tests, you can execute this from your project root:
 
 ```
 pip install -e .
+pip install -r tests/requirements.txt
 cd tests
 pytest ./plugin --alluredir allure-result
 ```
