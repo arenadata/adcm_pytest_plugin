@@ -51,6 +51,7 @@ E.g. `adcm` which expands to:
 - `cmd_opts`<sup>session scope only</sup> - fixture aimed to access values of cmd_line options
 - `adcm` - returns instance of ADCM wrapper (ADCM API and Docker container)
 - `sdk_client` - returns ADCMClient instance bounded to ADCM instance
+- `adcm_api_credentials` - returns dict with default ADCM credentials
 
 ## Functions and methods
 
