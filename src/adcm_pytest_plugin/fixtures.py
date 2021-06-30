@@ -212,7 +212,7 @@ def _attach_adcm_logs(request: SubRequest, adcm: ADCM):
 
 def _attach_adcm_url(request: SubRequest, adcm: ADCM):
     """Attach ADCM URL link to the Allure Report for the further access"""
-    attachment_name = "ADCM API URL"
+    attachment_name = "ADCM URL"
     reporter = _allure_reporter(request.config)
     if reporter:
         test_result = reporter.get_test(uuid=None)
