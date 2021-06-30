@@ -154,6 +154,7 @@ def _adcm(image, cmd_opts, request, adcm_api_credentials, upgradable=False) -> G
     yield adcm
 
     if request.config.option.dontstop:
+        _attach_adcm_url(request, adcm)
         return  # leave container intact
 
     gather = True
@@ -187,6 +188,7 @@ def _allure_reporter(config) -> Optional[AllureReporter]:
 
 @allure.step("Gather /adcm/data/ from ADCM container")
 def _attach_adcm_logs(request: SubRequest, adcm: ADCM):
+    """Gather /adcm/data/ form the ADCM container and attach it to the Allure Report"""
     file_name = f"ADCM Log {request.node.name}_{time.time()}"
     reporter = _allure_reporter(request.config)
     if reporter:
@@ -206,6 +208,27 @@ def _attach_adcm_logs(request: SubRequest, adcm: ADCM):
                 name="{}.tgz".format(file_name),
                 extension="tgz",
             )
+
+
+def _attach_adcm_url(request: SubRequest, adcm: ADCM):
+    """Attach ADCM URL link to the Allure Report for the further access"""
+    attachment_name = "ADCM API URL"
+    reporter = _allure_reporter(request.config)
+    if reporter:
+        test_result = reporter.get_test(uuid=None)
+        reporter.attach_data(
+            uuid=uuid4(),
+            body=adcm.url,
+            name=attachment_name,
+            extension="text",
+            parent_uuid=test_result.uuid,
+        )
+    else:
+        allure.attach(
+            body=adcm.url,
+            name=attachment_name,
+            extension="text",
+        )
 
 
 def _get_connection_ip(remote_host: str):
