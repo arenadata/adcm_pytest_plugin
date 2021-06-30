@@ -51,6 +51,7 @@ E.g. `adcm` which expands to:
 - `cmd_opts`<sup>session scope only</sup> - fixture aimed to access values of cmd_line options
 - `adcm` - returns instance of ADCM wrapper (ADCM API and Docker container)
 - `sdk_client` - returns ADCMClient instance bounded to ADCM instance
+- `adcm_api_credentials` - returns dict with default ADCM credentials
 
 ## Functions and methods
 
@@ -336,6 +337,7 @@ To run plugin tests, you can execute this from your project root:
 
 ```
 pip install -e .
+pip install -r tests/requirements.txt
 cd tests
 pytest ./plugin --alluredir allure-result
 ```
