@@ -53,6 +53,7 @@ __all__ = [
     "sdk_client_fs",
     "sdk_client_ss",
     "adcm_api_credentials",
+    "additional_adcm_init_config",
 ]
 
 
@@ -63,10 +64,22 @@ def adcm_api_credentials() -> dict:
     return {"user": "admin", "password": "admin"}
 
 
+@allure.title("Additional ADCM init config")
+@pytest.fixture(scope="session")
+def additional_adcm_init_config() -> dict:
+    """
+    Add options for ADCM init.
+    Redefine this fixture in the actual project to alter additional options of ADCM initialisation.
+    Ex. If this fixture will return {"fill_dummy_data": True}
+    then on the init stage dummy objects will be added to ADCM image
+    """
+    return {}
+
+
 # pylint: disable=W0621
 @allure.title("ADCM Image")
 @pytest.fixture(scope="session")
-def image(request, cmd_opts, adcm_api_credentials):
+def image(request, cmd_opts, adcm_api_credentials, additional_adcm_init_config):
     """That fixture creates ADCM container, waits until
     a database becomes initialised and stores that as images
     with random tag and name local/adcminit
@@ -114,6 +127,7 @@ def image(request, cmd_opts, adcm_api_credentials):
         dc=dc,
         adcm_api_credentials=adcm_api_credentials,
         **params,
+        **additional_adcm_init_config,
     ).get_initialized_adcm_image()
 
     yield init_image["repo"], init_image["tag"]
@@ -333,36 +347,3 @@ def sdk_client_ss(adcm_ss: ADCM, adcm_api_credentials) -> ADCMClient:
 def cmd_opts(request):
     """Returns pytest request options object"""
     return request.config.option
-
-
-@allure.title("Add dummy objects to ADCM")
-def _sdk_client_with_objects_ss(sdk_client):
-    """Returns ADCMClient with ADCM objects"""
-    with allure.step("Create provider"):
-        provider_bundle = sdk_client.upload_from_fs(utils.get_data_dir(__file__, "provider"))
-        provider = provider_bundle.provider_prototype().provider_create("Some provider")
-    with allure.step("Create cluster for the further import"):
-        cluster_to_import_bundle = sdk_client.upload_from_fs(utils.get_data_dir(__file__, "cluster_to_import"))
-        cluster_to_import = cluster_to_import_bundle.cluster_prototype().cluster_create(name="Dummy cluster to import")
-    with allure.step("Create a cluster with service"):
-        cluster_bundle = sdk_client.upload_from_fs(utils.get_data_dir(__file__, "cluster_with_service"))
-        cluster = cluster_bundle.cluster_prototype().cluster_create(name="Cluster with services")
-        cluster.bind(cluster_to_import)
-    with allure.step("Add services"):
-        service_first = cluster.service_add(name="Dummy service")
-        service_second = cluster.service_add(name="Second service")
-    with allure.step("Add hosts"):
-        host_first = provider.host_create("host_in_cluster")
-        host_second = provider.host_create("host_in_cluster_second")
-        cluster.host_add(host_first)
-        cluster.host_add(host_second)
-    with allure.step("Set components"):
-        cluster.hostcomponent_set(
-            (host_first, service_first.component(name="first")),
-            (host_second, service_first.component(name="second")),
-            (host_second, service_second.component(name="third")),
-        )
-    with allure.step("Run task"):
-        task = cluster.action(name="action_on_cluster").run()
-        task.wait()
-    return sdk_client

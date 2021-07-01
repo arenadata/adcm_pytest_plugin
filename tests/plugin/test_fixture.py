@@ -119,3 +119,8 @@ def test_with_xdist(testdir):
         additional_opts=[f"-n {gw_count}"],
         outcomes=dict(passed=gw_count),
     )
+
+
+def test_fixture_image_with_dummy_data(testdir):
+    """Test image creating and filling with dummy data by fixture from plugin"""
+    run_tests(testdir, "test_image_with_dummy_data.py")
