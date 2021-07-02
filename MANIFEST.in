@@ -1,2 +1,1 @@
-include src/adcm_pytest_plugin/confs_library/*.yaml
-include src/adcm_pytest_plugin/common_data/*
+recursive-include src/adcm_pytest_plugin/common_data *
