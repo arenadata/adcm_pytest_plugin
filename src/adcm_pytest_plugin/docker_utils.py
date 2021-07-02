@@ -219,16 +219,10 @@ class ADCMInitializer:
             ip_end = base_url.rfind(":")
             config.ip = base_url[ip_start:ip_end]
         self._adcm = dw.run_adcm_from_config(config)
-        self._adcm_cli = ADCMClient(url=self._adcm.url, **self.adcm_api_credentials)
         # Pre-upload bundles to ADCM before image initialization
         self._preupload_bundles()
         # Fill ADCM with a dummy objects
-        if self.fill_dummy_data:
-            add_dummy_objects_to_adcm(self._adcm_cli)
-        # logout from ADCM API
-        # TODO should be replaced with ADCMClient method https://arenadata.atlassian.net/browse/ADCM-1839
-        # pylint: disable=protected-access
-        self._adcm_cli._api.objects.logout.create()
+        self._fill_dummy_data()
         # Create a snapshot from initialized container
         self._adcm.container.stop()
         with allure.step(f"Commit initialized ADCM container to image {self.repo}:{self.tag}"):
@@ -239,12 +233,18 @@ class ADCMInitializer:
     def _preupload_bundles(self):
         if self.preupload_bundle_urls:
             with allure.step("Pre-upload bundles into ADCM before image initialization"):
+                self._init_adcm_cli()
                 for url in self.preupload_bundle_urls:
                     retry_call(
                         self._upload_bundle,
                         fargs=[url],
                         tries=5,
                     )
+
+    def _fill_dummy_data(self):
+        if self.fill_dummy_data:
+            self._init_adcm_cli()
+            add_dummy_objects_to_adcm(self._adcm_cli)
 
     def _upload_bundle(self, url):
         try:
@@ -254,6 +254,10 @@ class ADCMInitializer:
             # can occur in case of --staticimage use
             if "BUNDLE_ERROR" not in exception.error:
                 raise exception
+
+    def _init_adcm_cli(self):
+        if not self._adcm_cli:
+            self._adcm_cli = ADCMClient(url=self._adcm.url, **self.adcm_api_credentials)
 
 
 def image_exists(repo, tag, dc=None):
