@@ -37,7 +37,8 @@ from docker.errors import APIError, ImageNotFound, NotFound
 from docker.models.containers import Container
 from retry.api import retry_call
 
-from .utils import random_string, add_dummy_objects_to_adcm
+from .utils import random_string
+from .common import add_dummy_objects_to_adcm
 
 MIN_DOCKER_PORT = 8000
 MAX_DOCKER_PORT = 9000
