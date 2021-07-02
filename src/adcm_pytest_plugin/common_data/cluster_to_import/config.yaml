@@ -11,7 +11,7 @@
 # limitations under the License.
 
 -   type: cluster
-    name: Dummy cluster to import
+    name: Pre-uploaded Dummy cluster to import
     version: 2.5
     config:
       required:

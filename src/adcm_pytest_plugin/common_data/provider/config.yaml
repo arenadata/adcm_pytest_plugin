@@ -11,7 +11,7 @@
 # limitations under the License.
 ---
 - type: provider
-  name: provider_name
+  name: Pre-uploaded Provider
   version: 1.4
   config:
     - name: string
@@ -29,7 +29,7 @@
           - created
 
 - type: host
-  name: host_name
+  name: Pre-uploaded Host
   version: 1.0
   description: "That is description"
   config:

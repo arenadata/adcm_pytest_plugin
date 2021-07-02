@@ -49,7 +49,7 @@ def add_dummy_objects_to_adcm(adcm_client):
         cluster = cluster_bundle.cluster_prototype().cluster_create(name="Cluster with services")
         cluster.bind(cluster_to_import)
     with allure.step("Add services"):
-        service_first = cluster.service_add(name="Dummy service")
+        service_first = cluster.service_add(name="First service")
         service_second = cluster.service_add(name="Second service")
     with allure.step("Add hosts"):
         host_first = provider.host_create(fqdn="host_in_cluster")
