@@ -14,7 +14,7 @@
   name: Pre-uploaded Dummy cluster
   version: 1.5
   import:
-     Dummy cluster to import:
+     Pre-uploaded Dummy cluster to import:
           versions:
              max: 3.0
              min: 2.2
