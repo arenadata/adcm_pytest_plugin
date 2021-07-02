@@ -38,6 +38,7 @@ from docker.models.containers import Container
 from retry.api import retry_call
 
 from .utils import random_string
+from .common import add_dummy_objects_to_adcm
 
 MIN_DOCKER_PORT = 8000
 MAX_DOCKER_PORT = 9000
@@ -164,6 +165,7 @@ class ADCMInitializer:
         "dc",
         "preupload_bundle_urls",
         "adcm_api_credentials",
+        "fill_dummy_data",
         "_adcm",
         "_adcm_cli",
     )
@@ -179,6 +181,7 @@ class ADCMInitializer:
         dc=None,
         preupload_bundle_urls=None,
         adcm_api_credentials=None,
+        fill_dummy_data=False,
     ):
         self.repo = repo
         self.tag = tag if tag else random_string()
@@ -188,6 +191,7 @@ class ADCMInitializer:
         self.dc = dc if dc else docker.from_env(timeout=120)
         self.preupload_bundle_urls = preupload_bundle_urls
         self.adcm_api_credentials = adcm_api_credentials if adcm_api_credentials else {}
+        self.fill_dummy_data = fill_dummy_data
         self._adcm = None
         self._adcm_cli = None
 
@@ -217,6 +221,8 @@ class ADCMInitializer:
         self._adcm = dw.run_adcm_from_config(config)
         # Pre-upload bundles to ADCM before image initialization
         self._preupload_bundles()
+        # Fill ADCM with a dummy objects
+        self._fill_dummy_data()
         # Create a snapshot from initialized container
         self._adcm.container.stop()
         with allure.step(f"Commit initialized ADCM container to image {self.repo}:{self.tag}"):
@@ -227,13 +233,18 @@ class ADCMInitializer:
     def _preupload_bundles(self):
         if self.preupload_bundle_urls:
             with allure.step("Pre-upload bundles into ADCM before image initialization"):
-                self._adcm_cli = ADCMClient(url=self._adcm.url, **self.adcm_api_credentials)
+                self._init_adcm_cli()
                 for url in self.preupload_bundle_urls:
                     retry_call(
                         self._upload_bundle,
                         fargs=[url],
                         tries=5,
                     )
+
+    def _fill_dummy_data(self):
+        if self.fill_dummy_data:
+            self._init_adcm_cli()
+            add_dummy_objects_to_adcm(self._adcm_cli)
 
     def _upload_bundle(self, url):
         try:
@@ -243,6 +254,10 @@ class ADCMInitializer:
             # can occur in case of --staticimage use
             if "BUNDLE_ERROR" not in exception.error:
                 raise exception
+
+    def _init_adcm_cli(self):
+        if not self._adcm_cli:
+            self._adcm_cli = ADCMClient(url=self._adcm.url, **self.adcm_api_credentials)
 
 
 def image_exists(repo, tag, dc=None):

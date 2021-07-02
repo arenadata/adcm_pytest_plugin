@@ -1,1 +1,2 @@
 include src/adcm_pytest_plugin/confs_library/*.yaml
+include src/adcm_pytest_plugin/utils_data/*
