@@ -225,6 +225,10 @@ class ADCMInitializer:
         # Fill ADCM with a dummy objects
         if self.fill_dummy_data:
             add_dummy_objects_to_adcm(self._adcm_cli)
+        # logout from ADCM API
+        # TODO should be replaced with ADCMClient method https://arenadata.atlassian.net/browse/ADCM-1839
+        # pylint: disable=protected-access
+        self._adcm_cli._api.objects.logout.create()
         # Create a snapshot from initialized container
         self._adcm.container.stop()
         with allure.step(f"Commit initialized ADCM container to image {self.repo}:{self.tag}"):
