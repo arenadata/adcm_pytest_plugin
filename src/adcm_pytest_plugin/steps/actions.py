@@ -100,41 +100,42 @@ def _run_action_and_assert_result(
             kwargs["verbose"] = options.verbose_actions
         task = obj.action(name=action_name).run(**kwargs)
         wait_for_task_and_assert_result(task=task, action_name=action_name, status=expected_status, timeout=timeout)
+        return task
 
 
 def run_cluster_action_and_assert_result(cluster: Cluster, action: str, status="success", **kwargs):
     """
     Run cluster action and assert that status equals to 'status' argument
     """
-    _run_action_and_assert_result(obj=cluster, action_name=action, expected_status=status, **kwargs)
+    return _run_action_and_assert_result(obj=cluster, action_name=action, expected_status=status, **kwargs)
 
 
 def run_service_action_and_assert_result(service: Service, action: str, status="success", **kwargs):
     """
     Run service action and assert that status equals to 'status' argument
     """
-    _run_action_and_assert_result(obj=service, action_name=action, expected_status=status, **kwargs)
+    return _run_action_and_assert_result(obj=service, action_name=action, expected_status=status, **kwargs)
 
 
 def run_component_action_and_assert_result(component: Component, action: str, status="success", **kwargs):
     """
     Run component action and assert that status equals to 'status' argument
     """
-    _run_action_and_assert_result(obj=component, action_name=action, expected_status=status, **kwargs)
+    return _run_action_and_assert_result(obj=component, action_name=action, expected_status=status, **kwargs)
 
 
 def run_host_action_and_assert_result(host: Host, action: str, status="success", **kwargs):
     """
     Run host action and assert that status equals to 'status' argument
     """
-    _run_action_and_assert_result(obj=host, action_name=action, expected_status=status, **kwargs)
+    return _run_action_and_assert_result(obj=host, action_name=action, expected_status=status, **kwargs)
 
 
 def run_provider_action_and_assert_result(provider: Provider, action: str, status="success", **kwargs):
     """
     Run provider action and assert that status equals to 'status' argument
     """
-    _run_action_and_assert_result(obj=provider, action_name=action, expected_status=status, **kwargs)
+    return _run_action_and_assert_result(obj=provider, action_name=action, expected_status=status, **kwargs)
 
 
 @contextmanager
