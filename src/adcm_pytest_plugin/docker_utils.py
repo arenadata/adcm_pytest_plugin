@@ -372,7 +372,7 @@ class ADCM:
         with allure.step("Start newer adcm"):
             dw = DockerWrapper(base_url=self.container_config.docker_url)
             container, _ = dw.adcm_container_from_config(self.container_config)
-            _wait_for_adcm_container_init(container, self.ip, self.port, timeout=30)
+            _wait_for_adcm_container_init(container, self.ip, self.port)
             self.container = container
 
 
