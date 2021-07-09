@@ -443,7 +443,7 @@ class DockerWrapper:
             frontend_ip = self.client.api.inspect_container(container.id)["NetworkSettings"]["IPAddress"]
             port = "8000"
         with allure.step(f"ADCM API started on {frontend_ip}:{config.port}/api/v1"):
-            _wait_for_adcm_container_init(container, config.ip, port)
+            _wait_for_adcm_container_init(container, frontend_ip, port)
         return ADCM(container, frontend_ip, port, container_config=config)
 
     # pylint: disable=too-many-arguments
