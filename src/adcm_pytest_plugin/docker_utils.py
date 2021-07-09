@@ -442,7 +442,8 @@ class DockerWrapper:
         if frontend_ip == DEFAULT_IP and is_docker():
             frontend_ip = self.client.api.inspect_container(container.id)["NetworkSettings"]["IPAddress"]
             port = "8000"
-        _wait_for_adcm_container_init(container, config.ip, port)
+        with allure.step(f"ADCM API started on {frontend_ip}:{config.port}/api/v1"):
+            _wait_for_adcm_container_init(container, config.ip, port)
         return ADCM(container, frontend_ip, port, container_config=config)
 
     # pylint: disable=too-many-arguments
@@ -480,7 +481,6 @@ class DockerWrapper:
                 attachment_type=AttachmentType.JSON,
             )
             container = self._run_container(config) if config.port else self._run_container_on_free_port(config)
-        with allure.step(f"ADCM API started on {config.ip}:{config.port}/api/v1"):
             return container, config.port
 
     def _run_container_on_free_port(self, config: ContainerConfig) -> Container:
