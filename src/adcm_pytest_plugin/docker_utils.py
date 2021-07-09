@@ -37,7 +37,6 @@ from docker.errors import APIError, ImageNotFound, NotFound
 from docker.models.containers import Container
 from retry.api import retry_call
 
-from .plugin import options
 from .utils import random_string
 from .common import add_dummy_objects_to_adcm
 
@@ -431,9 +430,7 @@ class DockerWrapper:
         """
         if config.pull:
             self.client.images.pull(config.image, config.tag)
-        if hasattr(options, "debug_owner") and options.debug_owner:
-            config.labels["debug_owner"] = options.debug_owner
-        elif os.environ.get("BUILD_TAG"):
+        if os.environ.get("BUILD_TAG"):
             config.labels.update({"jenkins-job": os.environ["BUILD_TAG"]})
 
         container, port = self.adcm_container_from_config(config)
