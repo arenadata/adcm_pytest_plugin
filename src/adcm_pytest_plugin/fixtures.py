@@ -151,14 +151,13 @@ def _adcm(image, cmd_opts, request, adcm_api_credentials, upgradable=False) -> G
     else:
         dw = DockerWrapper()
         ip = _get_connection_ip(cmd_opts.remote_executor_host) if cmd_opts.remote_executor_host else None
-        if ip and is_docker():
-            if _get_if_type(ip) == "0":
-                raise EnvironmentError(
-                    "You are using network interface with 'bridge' "
-                    "type while running inside container."
-                    "There is no obvious way to get external ip in this case."
-                    "Try running container with pytest with --net=host option"
-                )
+        if ip and is_docker() and _get_if_type(ip) == "0":
+            raise EnvironmentError(
+                "You are using network interface with 'bridge' "
+                "type while running inside container."
+                "There is no obvious way to get external ip in this case."
+                "Try running container with pytest with --net=host option"
+            )
     volumes = {}
     if upgradable:
         volume_name = str(uuid.uuid4())[-12:]
