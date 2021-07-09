@@ -438,11 +438,12 @@ class DockerWrapper:
         # If test runner is running in docker then 127.0.0.1
         # will be local container loop interface instead of host loop interface,
         # so we need to establish ADCM API connection using internal docker network
-        if config.ip == DEFAULT_IP and is_docker():
-            config.ip = self.client.api.inspect_container(container.id)["NetworkSettings"]["IPAddress"]
+        frontend_ip = config.ip
+        if frontend_ip == DEFAULT_IP and is_docker():
+            frontend_ip = self.client.api.inspect_container(container.id)["NetworkSettings"]["IPAddress"]
             port = "8000"
         _wait_for_adcm_container_init(container, config.ip, port)
-        return ADCM(container, config.ip, port, container_config=config)
+        return ADCM(container, frontend_ip, port, container_config=config)
 
     # pylint: disable=too-many-arguments
     @deprecated(reason="use adcm_container_from_config")
