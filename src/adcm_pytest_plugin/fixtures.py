@@ -141,6 +141,9 @@ def image(request, cmd_opts, adcm_api_credentials, additional_adcm_init_config):
 def _adcm(image, cmd_opts, request, adcm_api_credentials, upgradable=False) -> Generator[ADCM, None, None]:
     repo, tag = image
     labels = {"pytest_node_id": request.node.nodeid}
+    # this option can be passed from private adcm-pytest-tools (check it's README.md for more info)
+    if hasattr(cmd_opts, "debug_owner") and cmd_opts.debug_owner:
+        labels["debug_owner"] = cmd_opts.debug_owner
     docker_url = None
     if cmd_opts.remote_docker:
         docker_url = f"tcp://{cmd_opts.remote_docker}"
@@ -149,14 +152,13 @@ def _adcm(image, cmd_opts, request, adcm_api_credentials, upgradable=False) -> G
     else:
         dw = DockerWrapper()
         ip = _get_connection_ip(cmd_opts.remote_executor_host) if cmd_opts.remote_executor_host else None
-        if ip and is_docker():
-            if _get_if_type(ip) == "0":
-                raise EnvironmentError(
-                    "You are using network interface with 'bridge' "
-                    "type while running inside container."
-                    "There is no obvious way to get external ip in this case."
-                    "Try running container with pytest with --net=host option"
-                )
+        if ip and is_docker() and _get_if_type(ip) == "0":
+            raise EnvironmentError(
+                "You are using network interface with 'bridge' "
+                "type while running inside container."
+                "There is no obvious way to get external ip in this case."
+                "Try running container with pytest with --net=host option"
+            )
     volumes = {}
     if upgradable:
         volume_name = str(uuid.uuid4())[-12:]
