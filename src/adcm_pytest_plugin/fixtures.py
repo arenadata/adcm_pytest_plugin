@@ -141,6 +141,7 @@ def image(request, cmd_opts, adcm_api_credentials, additional_adcm_init_config):
 def _adcm(image, cmd_opts, request, adcm_api_credentials, upgradable=False) -> Generator[ADCM, None, None]:
     repo, tag = image
     labels = {"pytest_node_id": request.node.nodeid}
+    # this option can be passed from private adcm-pytest-tools (check it's README.md for more info)
     if hasattr(cmd_opts, "debug_owner") and cmd_opts.debug_owner:
         labels["debug_owner"] = cmd_opts.debug_owner
     docker_url = None
