@@ -424,6 +424,10 @@ def expectparam(type_: Type) -> Callable:
     ... def test(request):
     ...    print("pass")
     >>> request = lambda _: ...
+    >>> test(request)  # doctest: +IGNORE_EXCEPTION_DETAIL
+    Traceback (most recent call last):
+    ...
+    ValueError: Expecting <class 'str'> instance as a fixture param
     >>> request.param = 42
     >>> test(request)
     pass
