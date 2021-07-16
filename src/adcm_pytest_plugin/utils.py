@@ -14,16 +14,17 @@ import os
 import random
 import string
 from contextlib import AbstractContextManager
-from time import time, sleep
-
-from typing import List, Iterable, Tuple, Union, Type
+from inspect import getfullargspec
+from time import sleep, time
+from typing import Callable, Iterable, List, Tuple, Type, Union
 
 import allure
 import pytest
 from _pytest.fixtures import FixtureFunctionMarker, _FixtureFunction
 from _pytest.mark import MarkDecorator
 from adcm_client.base import ObjectNotFound
-from adcm_client.objects import Host, Task, Cluster
+from adcm_client.objects import Cluster, Host, Task
+from decorator import decorator
 
 
 def remove_host(host: Host) -> Task:
@@ -413,3 +414,42 @@ class catch_failed(AbstractContextManager):
     def __exit__(self, exctype, excinst, exctb):
         if exctype is not None and issubclass(exctype, self._exctype):
             raise AssertionError(self._msg) from excinst
+
+
+def expectparam(type_: Type) -> Callable:
+    """Check that request.param exists and has a given type.
+    NB! Use before pytest.fixture() decorator.
+
+    >>> @expectparam(int)
+    ... def test(request):
+    ...    print("pass")
+    >>> request = lambda _: ...
+    >>> test(request)  # doctest: +IGNORE_EXCEPTION_DETAIL
+    Traceback (most recent call last):
+    ...
+    ValueError: Expecting <class 'str'> instance as a fixture param
+    >>> request.param = 42
+    >>> test(request)
+    pass
+    >>> request.param = "42"
+    >>> test(request)  # doctest: +IGNORE_EXCEPTION_DETAIL
+    Traceback (most recent call last):
+    ...
+    ValueError: Expecting <class 'str'> instance as a fixture param
+    """
+
+    @decorator
+    def impl(func: Callable, *args, **kwargs):
+        __tracebackhide__ = True  # pylint: disable=unused-variable
+
+        if getattr(func, "_pytestfixturefunction", False):
+            raise ValueError("expectparam decorator should be applied before @pytest.fixture()")
+
+        funspec = getfullargspec(func)
+        request = args[funspec.args.index("request")]
+        if not isinstance(getattr(request, "param", None), type_):
+            raise ValueError(f"Expecting {type_} instance as a fixture param")
+
+        return func(*args, **kwargs)
+
+    return impl
