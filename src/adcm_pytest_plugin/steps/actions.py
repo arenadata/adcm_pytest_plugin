@@ -151,7 +151,9 @@ def _suggest_action_if_not_exists(obj: Union[Cluster, Service, Host, Component],
         if suggest_actions:
             raise ObjectNotFound(f"No such action {action}. Did you mean: {suggest_actions}?") from e
         all_actions = ", ".join(all_actions)
-        raise ObjectNotFound(f"No such action {action}. Possible actions: {all_actions}.") from e
+        raise AssertionError(
+            f"No such action {action}. {obj.__class__.__name__} state: {obj.state}. Possible actions: {all_actions}"
+        ) from e
 
 
 @allure.step("Wait for a task to be completed")
