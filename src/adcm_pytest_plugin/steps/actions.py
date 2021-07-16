@@ -29,7 +29,7 @@ from ..plugin import options
 
 def _get_error_text_from_task_logs(task: Task):
     error_text = ""
-    for job in task.job_list():
+    for job in task.job_list(status="failed"):
         try:
             for log in job.log_list():
                 if log.type == "stdout":
