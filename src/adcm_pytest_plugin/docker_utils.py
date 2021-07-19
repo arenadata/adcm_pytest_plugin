@@ -440,7 +440,7 @@ class DockerWrapper:
         # so we need to establish ADCM API connection using internal docker network
         frontend_ip = config.ip
         if frontend_ip == DEFAULT_IP and is_docker():
-            frontend_ip = self.client.api.inspect_container(container.id)["NetworkSettings"]["IPAddress"]
+            frontend_ip = container.name
             port = "8000"
         with allure.step(f"ADCM API started on {frontend_ip}:{config.port}/api/v1"):
             _wait_for_adcm_container_init(container, frontend_ip, port)
