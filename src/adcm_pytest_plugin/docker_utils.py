@@ -337,7 +337,7 @@ class DockerWrapper:
                 attachment_type=AttachmentType.JSON,
             )
             container, config.bind_port = (
-                self._run_container(config) if (config.bind_port) else self._run_container_on_free_port(config)
+                self._run_container(config) if config.bind_port else self._run_container_on_free_port(config)
             )
 
         config.api_ip, config.api_port = self._get_adcm_ip_and_port(config, container)
@@ -350,7 +350,7 @@ class DockerWrapper:
         config.bind_port = _find_port(config.bind_ip)
         for _ in range(0, CONTAINER_START_RETRY_COUNT):
             try:
-                return self._run_container(config), config.bind_port
+                return self._run_container(config)
             except APIError as err:
                 if (
                     "failed: port is already allocated" in err.explanation
@@ -365,14 +365,17 @@ class DockerWrapper:
         raise RetryCountExceeded(f"Unable to start container after {CONTAINER_START_RETRY_COUNT} retries")
 
     def _run_container(self, config: ContainerConfig) -> Container:
-        return self.client.containers.run(
-            "{}:{}".format(config.image, config.tag),
-            ports={"8000": (config.bind_ip, config.bind_port)},
-            volumes=config.volumes,
-            remove=config.remove,
-            labels=config.labels,
-            name=config.name,
-            detach=True,
+        return (
+            self.client.containers.run(
+                "{}:{}".format(config.image, config.tag),
+                ports={"8000": (config.bind_ip, config.bind_port)},
+                volumes=config.volumes,
+                remove=config.remove,
+                labels=config.labels,
+                name=config.name,
+                detach=True,
+            ),
+            config.bind_port,
         )
 
     def _get_adcm_ip_and_port(self, config: ContainerConfig, container) -> Tuple[str, str]:
@@ -419,6 +422,7 @@ class ADCM:
         """ADCM IP address"""
         return self.container_config.api_port
 
+    @allure.step("Stop ADCM container")
     def stop(self):
         """Stop ADCM container"""
         self.container.stop()
@@ -427,6 +431,7 @@ class ADCM:
                 condition = "removed" if self.container.attrs["HostConfig"]["AutoRemove"] else "stopped"
                 self.container.wait(condition=condition, timeout=30)
 
+    @allure.step("Remove ADCM container")
     def remove(self):
         """Remove ADCM container"""
         with suppress(NotFound):
