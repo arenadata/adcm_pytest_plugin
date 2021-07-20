@@ -141,7 +141,7 @@ def image(request, cmd_opts, adcm_api_credentials, additional_adcm_init_config):
 def _adcm(image, cmd_opts, request, adcm_api_credentials, upgradable=False) -> Generator[ADCM, None, None]:
     repo, tag = image
     labels = {"pytest_node_id": request.node.nodeid}
-    # this option can be passed from private adcm-pytest-tools (check it's README.md for more info)
+    # this option can be passed from private adcm-pytest-tools (check its README.md for more info)
     if hasattr(cmd_opts, "debug_owner") and cmd_opts.debug_owner:
         labels["debug_owner"] = cmd_opts.debug_owner
     docker_url = None
@@ -163,8 +163,11 @@ def _adcm(image, cmd_opts, request, adcm_api_credentials, upgradable=False) -> G
     if upgradable:
         volume_name = str(uuid.uuid4())[-12:]
         volumes.update({volume_name: {"bind": "/adcm/shadow", "mode": "rw"}})
-    adcm = dw.run_adcm_from_config(
-        ContainerConfig(image=repo, tag=tag, pull=False, ip=ip, labels=labels, volumes=volumes, docker_url=docker_url)
+    adcm = ADCM(
+        docker_wrapper=dw,
+        container_config=ContainerConfig(
+            image=repo, tag=tag, pull=False, bind_ip=ip, labels=labels, volumes=volumes, docker_url=docker_url
+        ),
     )
 
     yield adcm

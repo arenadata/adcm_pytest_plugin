@@ -106,12 +106,13 @@ def test_with_xdist(testdir):
     gw_count = 4
     test_content = f"""
     import pytest
+    from adcm_client.objects import ADCMClient
 
     @pytest.mark.parametrize("arg", [*range({gw_count})])
     @pytest.mark.usefixtures("arg")
     def test_xdist_run(adcm_fs, adcm_api_credentials):
         username, password = adcm_api_credentials.values()
-        adcm_fs.api.auth(username, password)
+        ADCMClient(url=adcm_fs.url, user=username, password=password)
     """
     run_tests(
         testdir,  # keep from black
