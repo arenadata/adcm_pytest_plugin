@@ -98,6 +98,7 @@ def _run_action_and_assert_result(
     ), _suggest_action_if_not_exists(obj, action_name):
         if rpm.compare_versions(obj.adcm_version, "2021.02.04.13") >= 0 and "verbose" not in kwargs:
             kwargs["verbose"] = options.verbose_actions
+        obj.reread()
         task = obj.action(name=action_name).run(**kwargs)
         wait_for_task_and_assert_result(task=task, action_name=action_name, status=expected_status, timeout=timeout)
         return task
