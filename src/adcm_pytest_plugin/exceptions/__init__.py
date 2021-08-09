@@ -9,26 +9,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-- type: cluster
-  name: Dummy cluster
-  version: 1.5
-  actions:
-    fail_action:
-      type: job
-      script: fail_action.yaml
-      script_type: ansible
-      states:
-        available: any
-    fail_action_with_bundle_error:
-      type: job
-      script: fail_action_with_bundle_error.yaml
-      script_type: ansible
-      states:
-        available: any
-    fail_action_with_infrastructure_problem:
-      type: job
-      script: fail_action_with_infrastructure_problem.yaml
-      script_type: ansible
-      states:
-        available: any

@@ -17,6 +17,8 @@ WARNING: don't run this test with xdist!!!
 import allure
 import pytest
 
+from adcm_pytest_plugin.exceptions.bundles import BundleError
+from adcm_pytest_plugin.exceptions.infrastructure import InfrastructureProblem
 from adcm_pytest_plugin.steps.actions import run_cluster_action_and_assert_result
 from adcm_pytest_plugin.utils import get_data_dir
 from adcm_pytest_plugin.plugin import options
@@ -33,6 +35,18 @@ def test_fail_action(sdk_client_fs, bundle_dir):
     with pytest.raises(AssertionError) as action_run_exception:
         run_cluster_action_and_assert_result(cluster=cluster, action="fail_action")
     assert "Meant to fail" in str(action_run_exception.value), "No ansible error in AssertionError message"
+
+
+@pytest.mark.parametrize("bundle_dir", ["fail_action_cluster"])
+def test_fail_action_with_error_matching(sdk_client_fs, bundle_dir):
+    """Run fail action and assert that result is matched with custom assert errors"""
+    bundle_dir_full = get_data_dir(__file__, bundle_dir)
+    bundle = sdk_client_fs.upload_from_fs(bundle_dir_full)
+    cluster = bundle.cluster_create("test_cluster")
+    with pytest.raises(BundleError):
+        run_cluster_action_and_assert_result(cluster=cluster, action="fail_action_with_bundle_error")
+    with pytest.raises(InfrastructureProblem):
+        run_cluster_action_and_assert_result(cluster=cluster, action="fail_action_with_infrastructure_problem")
 
 
 @pytest.mark.parametrize("bundle_dir", ["simple_action_cluster"])
