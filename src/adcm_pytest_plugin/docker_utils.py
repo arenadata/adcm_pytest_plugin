@@ -9,8 +9,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Utils of docker interaction"""
 
-# pylint: disable=redefined-outer-name, C0103, E0401
 import io
 import json
 import os
@@ -46,11 +46,11 @@ MAX_WORKER_COUNT = 80
 
 
 class UnableToBind(Exception):
-    pass
+    """Raise when no free port to expose on docker container"""
 
 
 class RetryCountExceeded(Exception):
-    pass
+    """Raise when container restart count is exceeded"""
 
 
 def _port_is_free(ip, port) -> bool:
@@ -79,8 +79,8 @@ def is_docker() -> bool:
     """
     path = "/proc/self/cgroup"
     try:
-        with open(path) as f:
-            for line in f:
+        with open(path) as file:
+            for line in file:
                 if re.match(r"\d+:[\w=]+:/docker(-[ce]e)?/\w+", line):
                     return True
     except FileNotFoundError:
@@ -126,7 +126,7 @@ def get_file_from_container(instance, path, filename):
         return tar.extractfile(filename)
 
 
-# pylint: disable=too-many-instance-attributes
+# pylint: disable=too-many-instance-attributes,invalid-name
 class ADCMInitializer:
     """
     Class for initialized ADCM image preparation.
@@ -180,9 +180,10 @@ class ADCMInitializer:
         """
 
         if image_exists(self.repo, self.tag, self.dc):
-            return {"repo": self.repo, "tag": self.tag}
+            image = {"repo": self.repo, "tag": self.tag}
         else:
-            return self.init_adcm()
+            image = self.init_adcm()
+        return image
 
     def init_adcm(self):
         """Init ADCM coinaiter and commit it into image"""
@@ -304,7 +305,7 @@ class ContainerConfig:
         self.labels = self.labels or {}
 
 
-class DockerWrapper:
+class DockerWrapper:  # pylint: disable=too-few-public-methods
     """Class for connection to local docker daemon and spawn ADCM instances."""
 
     __slots__ = ("client",)

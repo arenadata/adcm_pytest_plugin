@@ -9,6 +9,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Conftest for doctests that running with pytest"""
 import shutil
 import contextlib
 import allure
@@ -17,11 +18,13 @@ from _pytest.doctest import DoctestItem
 
 
 def pytest_runtest_call(item):
+    """Add allure label for doctests"""
     if isinstance(item, DoctestItem):
         item.add_marker(allure.suite("Doctests"))
 
 
 @pytest.fixture(autouse=True)
 def add_namespaces(doctest_namespace):
+    """Configure global namespace of doctests"""
     doctest_namespace["shutil"] = shutil
     doctest_namespace["contextlib"] = contextlib

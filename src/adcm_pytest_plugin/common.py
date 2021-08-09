@@ -9,13 +9,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Common methods and classes"""
 
 import pytest
 import allure
 from .utils import get_data_dir
 
 
-class Layer:
+class Layer:  # pylint: disable=too-few-public-methods
     """
     Decorators of allure layers
     Example:

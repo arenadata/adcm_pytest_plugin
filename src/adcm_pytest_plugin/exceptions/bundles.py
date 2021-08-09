@@ -9,16 +9,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Exceptions with bundle logic reason"""
+
 
 class BundleError(AssertionError):
-    default_msg: str = ""
+    """Generic bundle error"""
 
     def __init__(self, msg=""):
-        super().__init__(msg or self.default_msg)
+        super().__init__(msg or self.__doc__)
 
     @classmethod
     def raise_if_suitable(cls, message):
+        """Raise suitable bundle error if possible"""
         __tracebackhide__ = True  # pylint: disable=unused-variable
+
         if "Wrong context" in message or "AnsibleFilterError" in message:
             raise AnsibleError(message)
         if "control process exited with error" in message:
@@ -28,12 +32,12 @@ class BundleError(AssertionError):
 
 
 class AnsibleError(BundleError):
-    default_msg = "Error in ansible logic"
+    """Error in ansible logic"""
 
 
 class SystemctlError(BundleError):
-    default_msg = "Systemctl job not working"
+    """Systemctl job not working"""
 
 
 class AllocateMemoryError(BundleError):
-    default_msg = "Cannot allocate memory"
+    """Cannot allocate memory"""

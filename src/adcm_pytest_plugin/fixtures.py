@@ -9,6 +9,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Fixtures of ADCM image and ADCM client"""
 import socket
 import time
 import uuid
@@ -107,9 +108,9 @@ def image(request, cmd_opts, adcm_api_credentials, additional_adcm_init_config):
 
     pull = not cmd_opts.nopull
     if cmd_opts.remote_docker:
-        dc = docker.DockerClient(base_url=f"tcp://{cmd_opts.remote_docker}", timeout=120)
+        docker_client = docker.DockerClient(base_url=f"tcp://{cmd_opts.remote_docker}", timeout=120)
     else:
-        dc = docker.from_env(timeout=120)
+        docker_client = docker.from_env(timeout=120)
 
     params = dict()
     if cmd_opts.staticimage:
@@ -124,7 +125,7 @@ def image(request, cmd_opts, adcm_api_credentials, additional_adcm_init_config):
 
     init_image = ADCMInitializer(
         pull=pull,
-        dc=dc,
+        dc=docker_client,
         adcm_api_credentials=adcm_api_credentials,
         **params,
         **additional_adcm_init_config,
@@ -135,7 +136,7 @@ def image(request, cmd_opts, adcm_api_credentials, additional_adcm_init_config):
     if cmd_opts.dontstop or cmd_opts.staticimage:
         return  # leave image intact
 
-    remove_docker_image(**init_image, dc=dc)
+    remove_docker_image(**init_image, dc=docker_client)
 
 
 def _adcm(image, cmd_opts, request, adcm_api_credentials, upgradable=False) -> Generator[ADCM, None, None]:
@@ -147,10 +148,10 @@ def _adcm(image, cmd_opts, request, adcm_api_credentials, upgradable=False) -> G
     docker_url = None
     if cmd_opts.remote_docker:
         docker_url = f"tcp://{cmd_opts.remote_docker}"
-        dw = DockerWrapper(base_url=docker_url)
+        docker_wrapper = DockerWrapper(base_url=docker_url)
         ip = cmd_opts.remote_docker.split(":")[0]
     else:
-        dw = DockerWrapper()
+        docker_wrapper = DockerWrapper()
         ip = _get_connection_ip(cmd_opts.remote_executor_host) if cmd_opts.remote_executor_host else None
         if ip and is_docker() and _get_if_type(ip) == "0":
             raise EnvironmentError(
@@ -164,7 +165,7 @@ def _adcm(image, cmd_opts, request, adcm_api_credentials, upgradable=False) -> G
         volume_name = str(uuid.uuid4())[-12:]
         volumes.update({volume_name: {"bind": "/adcm/shadow", "mode": "rw"}})
     adcm = ADCM(
-        docker_wrapper=dw,
+        docker_wrapper=docker_wrapper,
         container_config=ContainerConfig(
             image=repo, tag=tag, pull=False, bind_ip=ip, labels=labels, volumes=volumes, docker_url=docker_url
         ),
@@ -190,7 +191,7 @@ def _adcm(image, cmd_opts, request, adcm_api_credentials, upgradable=False) -> G
     with suppress(DockerReadTimeout):
         adcm.stop()
 
-    remove_container_volumes(adcm.container, dw.client)
+    remove_container_volumes(adcm.container, docker_wrapper.client)
 
 
 def _allure_reporter(config) -> Optional[AllureReporter]:
@@ -254,18 +255,18 @@ def _get_connection_ip(remote_host: str):
     """
     Try to open connection to remote and get ip address of the interface used.
     """
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.connect((remote_host, 1))
-    ip = s.getsockname()[0]
-    s.close()
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.connect((remote_host, 1))
+    ip = sock.getsockname()[0]
+    sock.close()
     return ip
 
 
 def _get_if_name_by_ip(if_ip):
     """Get interface name by interface IP"""
     for adapter in ifaddr.get_adapters():
-        for ip in adapter.ips:
-            if ip.ip == if_ip:
+        for ip_addr in adapter.ips:
+            if ip_addr.ip == if_ip:
                 return adapter.name
     raise ValueError(f"IP {if_ip} does not match any network interface!")
 
@@ -275,8 +276,8 @@ def _get_if_type(if_ip):
     Get interface type from /sys/class/net/{if_name}/type
     """
     if_name = _get_if_name_by_ip(if_ip)
-    with open(f"/sys/class/net/{if_name}/type", "r") as f:
-        return f.readline().strip()
+    with open(f"/sys/class/net/{if_name}/type", "r") as file:
+        return file.readline().strip()
 
 
 def _remove_hosts(adcm_cli: ADCMClient):

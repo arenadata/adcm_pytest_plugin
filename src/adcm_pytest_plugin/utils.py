@@ -9,6 +9,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Some utils of plugin"""
+
 
 import os
 import random
@@ -194,8 +196,8 @@ def get_subdirs_iter(filename: str, *subdirs) -> Iterable[str]:
 
     datadir = get_data_dir(filename)
     dirname = os.path.join(datadir, *subdirs)
-    for b in os.listdir(dirname):
-        full = os.path.join(dirname, b)
+    for subpath in os.listdir(dirname):
+        full = os.path.join(dirname, subpath)
         if os.path.isdir(full):
             yield full
 
@@ -265,9 +267,9 @@ def get_data_subdirs_as_parameters(filename: str, *subdirs) -> Tuple[List[str], 
     dirname = os.path.join(datadir, *subdirs)
     paths = []
     ids = []
-    for b in sorted(os.listdir(dirname)):
-        paths.append("{}/{}".format(dirname, b))
-        ids.append(b)
+    for subpath in sorted(os.listdir(dirname)):
+        paths.append("{}/{}".format(dirname, subpath))
+        ids.append(subpath)
     return paths, ids
 
 
@@ -379,8 +381,8 @@ def wait_until_step_succeeds(func, timeout: Union[int, float] = 300, period: Uni
         while time() - start < timeout:
             try:
                 func(**kwargs)
-            except AssertionError as e:
-                last_error = e
+            except AssertionError as err:
+                last_error = err
                 sleep(period)
                 continue
             break
@@ -390,7 +392,7 @@ def wait_until_step_succeeds(func, timeout: Union[int, float] = 300, period: Uni
             )
 
 
-class catch_failed(AbstractContextManager):
+class catch_failed(AbstractContextManager):  # pylint: disable=invalid-name
     """
     ContextManager to catch some errors and raise AssertionError with the given message.
     >>> class SomeException(Exception):

@@ -6,12 +6,31 @@ exclude = '''
 (
       \.git
     | \.venv
-    | __pycache__
-    | data
-    | docs
-    | os
-    | spec
-    | build
-    | dist
+    | /__pycache__/
+    | /data/
+    | /docs/
+    | /os/
+    | /spec/
+    | /build/
+    | /dist/
 )
 '''
+[tool.pylint.master]
+ignore-paths = [
+    "^build/.*$",
+    "^dist/.*$",
+]
+
+[tool.pylint.basic]
+good-names = ["i", "j", "k", "v", "ip"]
+
+[tool.pylint.messages_control]
+disable = []
+
+[tool.pylint.format]
+max-line-length = 120
+max-module-lines = 1000
+
+[tool.pylint.similarities]
+ignore-imports = true
+min-similarity-lines = 5

@@ -18,6 +18,7 @@ import pytest
 
 @pytest.fixture(scope="session")
 def additional_adcm_init_config() -> dict:
+    """ADCM config fixture"""
     return {"fill_dummy_data": True}
 
 
