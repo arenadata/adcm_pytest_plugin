@@ -10,9 +10,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Exceptions with infrastructure problems"""
+from adcm_pytest_plugin.exceptions import BuiltinLikeAssertionError
 
 
-class InfrastructureProblem(AssertionError):
+class InfrastructureProblem(BuiltinLikeAssertionError):
     """Generic infrastructure exception"""
 
     default_msg: str = ""

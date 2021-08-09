@@ -10,9 +10,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Exceptions with bundle logic reason"""
+from adcm_pytest_plugin.exceptions import BuiltinLikeAssertionError
 
 
-class BundleError(AssertionError):
+class BundleError(BuiltinLikeAssertionError):
     """Generic bundle error"""
 
     def __init__(self, msg=""):
