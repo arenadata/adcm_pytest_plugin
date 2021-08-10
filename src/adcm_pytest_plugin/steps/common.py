@@ -39,14 +39,19 @@ def assume_step(title, exception=None):
         raise ValueError("This is expected exception")
 
     """
-    if callable(title):  # pylint: disable=no-else-return
-        return AssumeStepContext(title.__name__, exception)(title)
+    if callable(title):
+        step = AssumeStepContext(title.__name__, exception)(title)
     else:
-        return AssumeStepContext(title, exception)
+        step = AssumeStepContext(title, exception)
+    return step
 
 
 class AssumeStepContext:
-    """Step wrapper like `allure.step`"""
+    """
+    Step wrapper like `allure.step`
+    Realize step as decorator and step as context manager
+    See `assume_step` docstring for info about using
+    """
 
     def __init__(self, title, exception=None):
         self.title = title
