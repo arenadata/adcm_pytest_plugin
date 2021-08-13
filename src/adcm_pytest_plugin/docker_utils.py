@@ -485,6 +485,7 @@ def remove_container_volumes(container: Container, dc: DockerClient):
         with suppress(NotFound):  # volume may be removed already
             dc.volumes.get(name).remove()
 
+
 @contextmanager
 def suppress_docker_wait_error():
     """
@@ -493,5 +494,7 @@ def suppress_docker_wait_error():
     try:
         yield
     except requests.exceptions.ConnectionError:
-        warnings.warn("Failed to wait container state at the specified timeout\n"
-                      "It's workaround of docker-py error, see https://github.com/docker/docker-py/issues/1966")
+        warnings.warn(
+            "Failed to wait container state at the specified timeout\n"
+            "It's workaround of docker-py error, see https://github.com/docker/docker-py/issues/1966"
+        )
