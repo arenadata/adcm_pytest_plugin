@@ -97,7 +97,7 @@ def _run_action_and_assert_result(
         f"Perform action '{action_name}' for {obj.__class__.__name__} '{obj_name}'"
     ), _suggest_action_if_not_exists(obj, action_name):
         if rpm.compare_versions(obj.adcm_version, "2021.02.04.13") >= 0 and "verbose" not in kwargs:
-            kwargs["verbose"] = options.verbose_actions
+            kwargs["verbose"] = options.verbose_actions  # pylint: disable=no-member
         obj.reread()
         task = obj.action(name=action_name).run(**kwargs)
         wait_for_task_and_assert_result(task=task, action_name=action_name, status=expected_status, timeout=timeout)
@@ -146,15 +146,15 @@ def _suggest_action_if_not_exists(obj: Union[Cluster, Service, Host, Component],
     """
     try:
         yield
-    except ObjectNotFound as e:
+    except ObjectNotFound as err:
         all_actions = [a.name for a in obj.action_list()]
         suggest_actions = ", ".join(get_close_matches(action, all_actions))
         if suggest_actions:
-            raise ObjectNotFound(f"No such action {action}. Did you mean: {suggest_actions}?") from e
+            raise ObjectNotFound(f"No such action {action}. Did you mean: {suggest_actions}?") from err
         all_actions = ", ".join(all_actions)
         raise AssertionError(
             f"No such action {action}. {obj.__class__.__name__} state: {obj.state}. Possible actions: {all_actions}"
-        ) from e
+        ) from err
 
 
 @allure.step("Wait for a task to be completed")

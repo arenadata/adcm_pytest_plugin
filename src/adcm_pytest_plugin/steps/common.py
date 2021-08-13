@@ -9,6 +9,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Common steps"""
 
 from contextlib import suppress
 from functools import wraps
@@ -39,23 +40,30 @@ def assume_step(title, exception=None):
 
     """
     if callable(title):
-        return AssumeStepContext(title.__name__, exception)(title)
+        step = AssumeStepContext(title.__name__, exception)(title)
     else:
-        return AssumeStepContext(title, exception)
+        step = AssumeStepContext(title, exception)
+    return step
 
 
 class AssumeStepContext:
+    """
+    Step wrapper like `allure.step`
+    Realize step as decorator and step as context manager
+    See `assume_step` docstring for info about using
+    """
+
     def __init__(self, title, exception=None):
         self.title = title
         self.exceptions = (Skipped, exception) if exception else Skipped
         self.allure_cm = allure.step(title)
         self.suppress = suppress(self.exceptions)
 
-    def __call__(self, f):
-        @wraps(f)
+    def __call__(self, func):
+        @wraps(func)
         def decorator(*args, **kwargs):
             with self.suppress:
-                return allure.step(self.title)(f)(*args, **kwargs)
+                return allure.step(self.title)(func)(*args, **kwargs)
 
         return decorator
 

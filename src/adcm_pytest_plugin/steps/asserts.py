@@ -18,6 +18,9 @@ import allure
 
 from adcm_client.objects import BaseAPIObject
 
+from adcm_pytest_plugin.exceptions.bundles import BundleError
+from adcm_pytest_plugin.exceptions.infrastructure import InfrastructureProblem
+
 
 def assert_state(obj: BaseAPIObject, state):
     """
@@ -68,4 +71,6 @@ def assert_action_result(result: str, status: str, name="", additional_message="
     message = f"Action {name} finished execution with unexpected result - '{result}'. " f"Expected - '{status}'"
     if additional_message:
         message += f"\n{additional_message}"
+        InfrastructureProblem.raise_if_suitable(message)
+        BundleError.raise_if_suitable(message)
     assert result == status, message

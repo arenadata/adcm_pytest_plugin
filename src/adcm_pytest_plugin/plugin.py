@@ -10,7 +10,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pylint: disable=W0611, W0401, W0614
+"""Main module of plugin with options and hooks"""
+# pylint: disable=wildcard-import,unused-wildcard-import
 import os
 from argparse import Namespace
 
@@ -33,12 +34,12 @@ def pytest_configure(config: Config):
         def some_func():
             adcm_image = options.adcm_image
     """
-    global options  # pylint: disable=global-statement
+    global options  # pylint: disable=global-statement,invalid-name
     options.__dict__.update(config.option.__dict__)
 
 
-# pylint: disable=W0621
 def pytest_addoption(parser):
+    """Add plugin CLI options"""
 
     parser.addoption(
         "--staticimage",
@@ -125,6 +126,7 @@ def pytest_generate_tests(metafunc):
 
 
 def parametrized_by_adcm_version(adcm_min_version=None, adcm_images=None):
+    """Return params with range from ADCM min version to current ADCM version"""
     params = None
     ids = None
     if adcm_min_version:
@@ -153,7 +155,7 @@ def _get_adcm_new_versions_tags(min_ver):
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
-def pytest_runtest_makereport(item, call):
+def pytest_runtest_makereport(item):
     """
     There is no default info about test stages execution available in pytest
     This hook is meant to store such info im metadata
@@ -169,7 +171,7 @@ def pytest_runtest_makereport(item, call):
     setattr(item, "rep_" + rep.when, rep)
 
 
-def pytest_sessionfinish(session, exitstatus):
+def pytest_sessionfinish():
     """
     Clear custom env variables at the end of all tests
     """

@@ -15,12 +15,13 @@ Tests for plugin fixtures.
 Does not contain tests with 'remote_executor_host', 'remote_docker', 'nopull' cmd opts
 WARNING: don't run this test with xdist!!!
 """
+from contextlib import suppress
+
 import allure
 import docker
 import pytest
-
-from contextlib import suppress
 from requests.exceptions import ReadTimeout as DockerReadTimeout
+
 from tests.plugin.common import run_tests
 
 pytestmark = [allure.suite("Plugin fixtures")]

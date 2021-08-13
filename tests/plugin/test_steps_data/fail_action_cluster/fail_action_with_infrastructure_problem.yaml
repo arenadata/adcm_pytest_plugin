@@ -9,4 +9,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Init plugin"""
+---
+- name: Fail action with infrastructure problem
+  hosts: localhost
+  connection: local
+  gather_facts: no
+
+  tasks:
+    - name: Fail
+      fail:
+        msg: Service Unavailable
