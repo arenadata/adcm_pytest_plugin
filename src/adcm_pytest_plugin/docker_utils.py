@@ -18,6 +18,7 @@ import re
 import socket
 import string
 import tarfile
+import warnings
 from contextlib import contextmanager, suppress
 from dataclasses import asdict, dataclass
 from gzip import compress
@@ -26,6 +27,7 @@ from typing import Optional, Tuple
 import allure
 import docker
 import pytest
+import requests.exceptions
 from adcm_client.objects import ADCMClient
 from adcm_client.util.wait import wait_for_url
 from allure_commons.types import AttachmentType
@@ -430,7 +432,8 @@ class ADCM:
         if self.container_config.remove:
             with suppress(NotFound):
                 condition = "removed" if self.container.attrs["HostConfig"]["AutoRemove"] else "stopped"
-                self.container.wait(condition=condition, timeout=30)
+                with suppress_docker_wait_error():
+                    self.container.wait(condition=condition, timeout=30)
 
     @allure.step("Remove ADCM container")
     def remove(self):
@@ -465,11 +468,8 @@ def remove_docker_image(repo: str, tag: str, dc: DockerClient):
     """Remove docker image"""
     image_name = f"{repo}:{tag}"
     for container in dc.containers.list(filters=dict(ancestor=image_name)):
-        try:
+        with suppress_docker_wait_error():
             container.wait(condition="removed", timeout=30)
-        except ConnectionError:
-            # https://github.com/docker/docker-py/issues/1966 workaround
-            pass
     retry_call(
         dc.images.remove,
         fargs=[image_name],
@@ -484,3 +484,17 @@ def remove_container_volumes(container: Container, dc: DockerClient):
     for name in [mount["Name"] for mount in container.attrs["Mounts"] if mount["Type"] == "volume"]:
         with suppress(NotFound):  # volume may be removed already
             dc.volumes.get(name).remove()
+
+
+@contextmanager
+def suppress_docker_wait_error():
+    """
+    Suppress requests ConnectionError to avoid unhandled docker-py exception
+    """
+    try:
+        yield
+    except requests.exceptions.ConnectionError:
+        warnings.warn(
+            "Failed to wait container state at the specified timeout\n"
+            "It's workaround of docker-py error, see https://github.com/docker/docker-py/issues/1966"
+        )
