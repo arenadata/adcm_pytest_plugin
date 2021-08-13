@@ -21,6 +21,7 @@ import allure
 import docker
 import pytest
 from requests.exceptions import ReadTimeout as DockerReadTimeout
+from adcm_pytest_plugin.docker_utils import suppress_docker_wait_error
 
 from tests.plugin.common import run_tests
 
@@ -72,8 +73,7 @@ def test_fixture_image_staticimage(testdir):
 
     # Remove created static image after test
     for container in client.containers.list(filters=dict(ancestor=custom_image_name)):
-        # https://github.com/docker/docker-py/issues/1966 workaround
-        with suppress(ConnectionError):
+        with suppress_docker_wait_error():
             container.wait(condition="removed", timeout=30)
     client.images.remove(custom_image_name, force=True)
 
