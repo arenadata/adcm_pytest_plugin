@@ -138,7 +138,9 @@ def image(request, cmd_opts, adcm_api_credentials, additional_adcm_init_config):
     remove_docker_image(**init_image, dc=docker_client)
 
 
-def _adcm(image, cmd_opts, request, upgradable=False) -> Generator[ADCM, None, None]:
+def _adcm(
+    image, cmd_opts, request, adcm_api_credentials=None, upgradable=False  # pylint: disable=unused-argument
+) -> Generator[ADCM, None, None]:
     repo, tag = image
     labels = {"pytest_node_id": request.node.nodeid}
     # this option can be passed from private adcm-pytest-tools (check its README.md for more info)
