@@ -297,6 +297,12 @@ def _remove_hosts(adcm_cli: ADCMClient):
             job.wait(timeout=60)
 
 
+def _adcm_is_upgradable(request) -> bool:
+    if hasattr(request, "param") and request.param:
+        return True
+    return False
+
+
 ##################################################
 #                  S D K
 ##################################################
@@ -331,24 +337,24 @@ def adcm_ss(image, cmd_opts, request, adcm_api_credentials, adcm_is_upgradable_s
 
 
 @allure.title("[SS] ADCM upgradable flag")
-@pytest.fixture(params=[False], scope="session")
+@pytest.fixture(scope="session")
 def adcm_is_upgradable_ss(request) -> bool:
     """Set flag that controls either ADCM will be upgradable or not"""
-    return request.param
+    return _adcm_is_upgradable(request)
 
 
 @allure.title("[MS] ADCM upgradable flag")
-@pytest.fixture(params=[False], scope="module")
+@pytest.fixture(scope="module")
 def adcm_is_upgradable_ms(request) -> bool:
     """Set flag that controls either ADCM will be upgradable or not"""
-    return request.param
+    return _adcm_is_upgradable(request)
 
 
 @allure.title("[FS] ADCM upgradable flag")
-@pytest.fixture(params=[False])
+@pytest.fixture()
 def adcm_is_upgradable_fs(request) -> bool:
     """Set flag that controls either ADCM will be upgradable or not"""
-    return request.param
+    return _adcm_is_upgradable(request)
 
 
 @allure.title("[MS] ADCM Client")
