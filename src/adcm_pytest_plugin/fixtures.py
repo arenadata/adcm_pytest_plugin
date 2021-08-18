@@ -299,32 +299,53 @@ def _remove_hosts(adcm_cli: ADCMClient):
 ##################################################
 @allure.title("[MS] ADCM Container")
 @pytest.fixture(scope="module")
-def adcm_ms(image, cmd_opts, request, adcm_api_credentials) -> Generator[ADCM, None, None]:
+def adcm_ms(image, cmd_opts, request, adcm_api_credentials, adcm_is_upgradable_ms: bool) -> Generator[ADCM, None, None]:
     """Runs adcm container from the previously initialized image.
     Operates '--dontstop' option.
     Returns authorized instance of ADCM object
     """
-    yield from _adcm(image, cmd_opts, request, adcm_api_credentials)
+    yield from _adcm(image, cmd_opts, request, adcm_api_credentials, upgradable=adcm_is_upgradable_ms)
 
 
 @allure.title("[FS] ADCM Container")
 @pytest.fixture(scope="function")
-def adcm_fs(image, cmd_opts, request, adcm_api_credentials) -> Generator[ADCM, None, None]:
+def adcm_fs(image, cmd_opts, request, adcm_api_credentials, adcm_is_upgradable_fs: bool) -> Generator[ADCM, None, None]:
     """Runs adcm container from the previously initialized image.
     Operates '--dontstop' option.
     Returns authorized instance of ADCM object
     """
-    yield from _adcm(image, cmd_opts, request, adcm_api_credentials)
+    yield from _adcm(image, cmd_opts, request, adcm_api_credentials, upgradable=adcm_is_upgradable_fs)
 
 
 @allure.title("[SS] ADCM Container")
 @pytest.fixture(scope="session")
-def adcm_ss(image, cmd_opts, request, adcm_api_credentials) -> Generator[ADCM, None, None]:
+def adcm_ss(image, cmd_opts, request, adcm_api_credentials, adcm_is_upgradable_ss: bool) -> Generator[ADCM, None, None]:
     """Runs adcm container from the previously initialized image.
     Operates '--dontstop' option.
     Returns authorized instance of ADCM object
     """
-    yield from _adcm(image, cmd_opts, request, adcm_api_credentials)
+    yield from _adcm(image, cmd_opts, request, adcm_api_credentials, upgradable=adcm_is_upgradable_ss)
+
+
+@allure.title("[SS] ADCM upgradable flag")
+@pytest.fixture(params=[False], scope="session")
+def adcm_is_upgradable_ss(request) -> bool:
+    """Set flag that controls either ADCM will be upgradable or not"""
+    return request.param
+
+
+@allure.title("[MS] ADCM upgradable flag")
+@pytest.fixture(params=[False], scope="module")
+def adcm_is_upgradable_ms(request) -> bool:
+    """Set flag that controls either ADCM will be upgradable or not"""
+    return request.param
+
+
+@allure.title("[FS] ADCM upgradable flag")
+@pytest.fixture(params=[False])
+def adcm_is_upgradable_fs(request) -> bool:
+    """Set flag that controls either ADCM will be upgradable or not"""
+    return request.param
 
 
 @allure.title("[MS] ADCM Client")
