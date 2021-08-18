@@ -21,7 +21,6 @@ import docker
 import ifaddr
 import pytest
 from _pytest.fixtures import SubRequest
-from adcm_client.base import Paging, WaitTimeout
 from adcm_client.objects import ADCMClient
 from allure_commons.reporter import AllureReporter
 from allure_commons.utils import uuid4
@@ -40,7 +39,7 @@ from .docker_utils import (
     remove_docker_image,
     split_tag,
 )
-from .utils import check_mutually_exclusive, remove_host
+from .utils import check_mutually_exclusive
 
 DATADIR = utils.get_data_dir(__file__)
 
@@ -139,7 +138,7 @@ def image(request, cmd_opts, adcm_api_credentials, additional_adcm_init_config):
     remove_docker_image(**init_image, dc=docker_client)
 
 
-def _adcm(image, cmd_opts, request, adcm_api_credentials, upgradable=False) -> Generator[ADCM, None, None]:
+def _adcm(image, cmd_opts, request, upgradable=False) -> Generator[ADCM, None, None]:
     repo, tag = image
     labels = {"pytest_node_id": request.node.nodeid}
     # this option can be passed from private adcm-pytest-tools (check its README.md for more info)
@@ -185,8 +184,6 @@ def _adcm(image, cmd_opts, request, adcm_api_credentials, upgradable=False) -> G
             gather = False
     if gather:
         _attach_adcm_logs(request, adcm)
-
-    _remove_hosts(ADCMClient(url=adcm.url, **adcm_api_credentials))
 
     with suppress(DockerReadTimeout):
         adcm.stop()
@@ -278,20 +275,6 @@ def _get_if_type(if_ip):
     if_name = _get_if_name_by_ip(if_ip)
     with open(f"/sys/class/net/{if_name}/type", "r") as file:
         return file.readline().strip()
-
-
-def _remove_hosts(adcm_cli: ADCMClient):
-    for cluster in Paging(adcm_cli.cluster_list):
-        cluster.delete()
-    jobs = list()
-    for host in Paging(adcm_cli.host_list):
-        if host.state != "removed" and "remove" in list(map(lambda x: getattr(x, "name"), host.action_list())):
-            jobs.append(remove_host(host))
-    for job in jobs:
-        # In case when host were not removed in requested timeout
-        # we don't want it to affect test result
-        with suppress(WaitTimeout):
-            job.wait(timeout=60)
 
 
 ##################################################
