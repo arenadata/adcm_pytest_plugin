@@ -133,7 +133,7 @@ def test_upgradable_adcm_flag(testdir):
     test_content = """
     import pytest
     from adcm_pytest_plugin.docker_utils import ADCM
-    
+
     @pytest.mark.parametrize("adcm_is_upgradable", [True, False], indirect=True)
     def test_adcm_is_upgradable(adcm_fs: ADCM):
         assert len(adcm_fs.container_config.volumes) > 0
@@ -141,7 +141,7 @@ def test_upgradable_adcm_flag(testdir):
             if volume["bind"] == "/adcm/shadow":
                 break
         else:
-            raise AssertionError("Volume for upgrade wasn't found") 
+            raise AssertionError("Volume for upgrade wasn't found")
     """
     run_tests(testdir, makepyfile_str=test_content, outcomes=dict(passed=1, failed=1))
 
@@ -151,7 +151,7 @@ def test_upgradable_adcm_flag_change_one_test(testdir):
     test_content = """
     import pytest
     from adcm_pytest_plugin.docker_utils import ADCM
-    
+
     @pytest.mark.parametrize("adcm_is_upgradable", [True], indirect=True)
     def test_adcm_is_upgradable(adcm_fs: ADCM):
         assert len(adcm_fs.container_config.volumes) > 0
@@ -167,6 +167,6 @@ def test_upgradable_adcm_flag_change_one_test(testdir):
             if volume["bind"] == "/adcm/shadow":
                 break
         else:
-            raise AssertionError("Volume for upgrade wasn't found") 
+            raise AssertionError("Volume for upgrade wasn't found")
     """
     run_tests(testdir, makepyfile_str=test_content, outcomes=dict(passed=1, failed=1))
