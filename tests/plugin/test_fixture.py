@@ -162,11 +162,7 @@ def test_upgradable_adcm_flag_change_one_test(testdir):
             raise AssertionError("Volume for upgrade wasn't found")
 
     def test_adcm_is_upgradable_fail(adcm_fs: ADCM):
-        assert len(adcm_fs.container_config.volumes) > 0
         for volume in adcm_fs.container_config.volumes.values():
-            if volume["bind"] == "/adcm/shadow":
-                break
-        else:
-            raise AssertionError("Volume for upgrade wasn't found")
+            assert volume["bind"] != "/adcm/shadow"
     """
-    run_tests(testdir, makepyfile_str=test_content, outcomes=dict(passed=1, failed=1))
+    run_tests(testdir, makepyfile_str=test_content, outcomes=dict(passed=2))
