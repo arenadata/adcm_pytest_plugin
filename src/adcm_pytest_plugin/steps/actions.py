@@ -28,12 +28,44 @@ from ..plugin import options
 
 
 def _get_error_text_from_task_logs(task: Task):
+    """
+    Extract error message from task logs
+
+    >>> test_task = lambda: None
+    >>> test_job = lambda: None
+    >>> stdout_log = lambda: None
+    >>> stdout_log.type = "stdout"
+    >>> stderr_log = lambda: None
+    >>> stderr_log.type = "stderr"
+    >>> test_job.log_list = lambda: [stderr_log, stdout_log]
+    >>> test_task.job_list = lambda status: [test_job]
+    >>> stdout_log.content = "fatal: Some ERROR\\nTASK [api : something] **********\\n"
+    >>> stderr_log.content = "ERROR! the role 'monitoring' was not found\\n"
+    >>> _get_error_text_from_task_logs(test_task)
+    "ERROR! the role 'monitoring' was not found"
+    >>> stdout_log.content = "fatal: Some ERROR\\nTASK [api : something] **********\\n"
+    >>> stderr_log.content = "[WARNING] conditional statements should not include jinja2 templating\\n"
+    >>> _get_error_text_from_task_logs(test_task)
+    'fatal: Some ERROR'
+    >>> error_obj = lambda: None
+    >>> error_obj._data = dict()
+    >>> error_obj._data["code"] = "LOG_NOT_FOUND"
+    >>> multijob_logs_error = ErrorMessage(error=error_obj)
+    >>> test_job.log_list = lambda: (_ for _ in ()).throw(multijob_logs_error)
+    >>> _get_error_text_from_task_logs(test_task)
+    ''
+    """
+
     error_text = ""
     for job in task.job_list(status="failed"):
         try:
             for log in job.log_list():
+                if log.type == "stderr":
+                    if extracted_error := _extract_error_from_ansible_stderr(log.content):
+                        error_text += extracted_error
+                        break
                 if log.type == "stdout":
-                    error_text += _extract_error_from_ansible_log(log.content)
+                    error_text += _extract_error_from_ansible_stdout(log.content)
         except ErrorMessage as log_exception:
             # Multijobs has no logs for parent Job
             # pylint: disable=protected-access
@@ -44,20 +76,56 @@ def _get_error_text_from_task_logs(task: Task):
     return error_text
 
 
-def _extract_error_from_ansible_log(log: str):
+def _extract_error_from_ansible_stderr(stderr: str):
     """
-    Extract ansible error message from ansible log
+    Extract ansible error message from ansible stderr log
 
-    >>> _extract_error_from_ansible_log("fatal: Some ERROR\\nTASK [api : something] **********")
-    'fatal: Some ERROR\\n'
-    >>> _extract_error_from_ansible_log('''
+    >>> this = _extract_error_from_ansible_stderr
+    >>> this('''
+    ... [WARNING]: conditional statements should not include jinja2 templating
+    ... [DEPRECATION WARNING]: Use errors="ignore" instead of skip. This feature will
+    ... ''')
+    ''
+    >>> this('''
+    ... [WARNING]: conditional statements should not include jinja2 templating
+    ... ERROR! the role 'monitoring' was not found
+    ...  include_role:
+    ...    name: monitoring
+    ...          ^ here
+    ... [DEPRECATION WARNING]: Use errors="ignore" instead of skip. This feature will
+    ... ''')
+    "ERROR! the role \'monitoring\' was not found\\n include_role:\\n   name: monitoring\\n         ^ here\\n"
+    >>> this('''
+    ... [WARNING]: conditional statements should not include jinja2 templating
+    ... ERROR! the role 'monitoring' was not found
+    ...  include_role:
+    ...    name: monitoring
+    ...          ^ here
+    ... ''')
+    "ERROR! the role \'monitoring\' was not found\\n include_role:\\n   name: monitoring\\n         ^ here"
+    """
+    err_start = stderr.find("ERROR!")
+    if err_start > -1:
+        err_end = stderr.rfind("[", err_start)
+        return stderr[err_start:err_end]
+    return ""
+
+
+def _extract_error_from_ansible_stdout(log: str):
+    """
+    Extract ansible error message from ansible stdout log
+
+    >>> this = _extract_error_from_ansible_stdout
+    >>> this("fatal: Some ERROR\\nTASK [api : something] **********")
+    'fatal: Some ERROR'
+    >>> this('''
     ... TASK [api : something] ***
     ... datetime **********
     ... ok: [adcm-cluster-adb-gw0-e330benhwqir]
     ... msg: All assertions passed"
     ... ''')
     ''
-    >>> _extract_error_from_ansible_log('''
+    >>> this('''
     ... TASK [api : something] ***
     ... datetime **********
     ... ok: [adcm-cluster-adb-gw0-e330benhwqir]
@@ -69,16 +137,47 @@ def _extract_error_from_ansible_log(log: str):
     ... msg: Assertion failed
     ... NO MORE HOSTS LEFT *********
     ... ''')
-    'TASK [failed task] ***\\ndatetime *********\\nfatal: [fqdn]: FAILED! => changed=false\\nmsg: Assertion failed\\n'
+    'TASK [failed task] ***\\ndatetime *********\\nfatal: [fqdn]: FAILED! => changed=false\\nmsg: Assertion failed'
+    >>> this('''
+    ... TASK [ignoring failed task] ***
+    ... datetime *********
+    ... fatal: [fqdn]: FAILED! => changed=false
+    ... msg: Assertion failed
+    ... ...ignoring
+    ... NO MORE HOSTS LEFT *********
+    ... ''')
+    ''
+    >>> this('''
+    ... TASK [ignoring failed task] ***
+    ... datetime *********
+    ... fatal: [fqdn]: FAILED! => changed=false
+    ... msg: Assertion failed
+    ... ...ignoring
+    ...
+    ... TASK [failed task] ***
+    ... datetime *********
+    ... fatal: [fqdn]: FAILED! => changed=false
+    ... msg: captured
+    ...
+    ... TASK [api : something] ***
+    ... datetime **********
+    ... ok: [adcm-cluster-adb-gw0-e330benhwqir]
+    ... msg: All assertions passed"
+    ... NO MORE HOSTS LEFT *********
+    ... ''')
+    'TASK [failed task] ***\\ndatetime *********\\nfatal: [fqdn]: FAILED! => changed=false\\nmsg: captured\\n'
     """
     err_start = log.find("fatal:")
     if err_start > -1:
         task_name = log.rfind("TASK [", 0, err_start)
-        task_marker = log.find("******", err_start)
-        err_end = log.rfind("\n", 0, task_marker) + 1
+        task_marker = log.find("***", err_start)
+        err_end = log.rfind("\n", 0, task_marker)
         if task_name > -1:
             err_start = task_name
-        return log[err_start:err_end]
+        error_text = log[err_start:err_end]
+        if "...ignoring" in error_text:
+            return _extract_error_from_ansible_stdout(log.replace(error_text, ""))
+        return error_text
     return ""
 
 
