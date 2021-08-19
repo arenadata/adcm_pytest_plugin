@@ -126,3 +126,21 @@ def test_with_xdist(testdir):
 def test_fixture_image_with_dummy_data(testdir):
     """Test image creating and filling with dummy data by fixture from plugin"""
     run_tests(testdir, "test_image_with_dummy_data.py")
+
+
+def test_upgradable_adcm_flag(testdir):
+    """Test ADCM become upgradable if flag is True"""
+    test_content = """
+    import pytest
+    from adcm_pytest_plugin.docker_utils import ADCM
+    
+    @pytest.mark.parametrize("adcm_is_upgradable", [True, False], indirect=True)
+    def test_adcm_is_upgradable(adcm_fs: ADCM):
+        assert len(adcm_fs.container_config.volumes) > 0
+        for volume in adcm_fs.container_config.volumes.values():
+            if volume["bind"] == "/adcm/shadow":
+                break
+        else:
+            raise AssertionError("Volume for upgrade wasn't found") 
+    """
+    run_tests(testdir, makepyfile_str=test_content, outcomes=dict(passed=1, failed=1))
