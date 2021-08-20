@@ -24,7 +24,7 @@ class BundleError(BuiltinLikeAssertionError):
         """Raise suitable bundle error if possible"""
         __tracebackhide__ = True  # pylint: disable=unused-variable
 
-        if "Wrong context" in message or "AnsibleFilterError" in message:
+        if any(map(lambda x: x in message, ["Wrong context", "AnsibleFilterError", "ERROR!"])):
             raise AnsibleError(message)
         if "control process exited with error" in message:
             raise SystemctlError(message)
