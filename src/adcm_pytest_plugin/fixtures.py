@@ -283,32 +283,32 @@ def _get_if_type(if_ip):
 ##################################################
 @allure.title("[MS] ADCM Container")
 @pytest.fixture(scope="module")
-def adcm_ms(image, cmd_opts, request, adcm_api_credentials, adcm_is_upgradable: bool) -> Generator[ADCM, None, None]:
+def adcm_ms(image, cmd_opts, request, adcm_is_upgradable: bool) -> Generator[ADCM, None, None]:
     """Runs adcm container from the previously initialized image.
     Operates '--dontstop' option.
     Returns authorized instance of ADCM object
     """
-    yield from _adcm(image, cmd_opts, request, adcm_api_credentials, upgradable=adcm_is_upgradable)
+    yield from _adcm(image, cmd_opts, request, upgradable=adcm_is_upgradable)
 
 
 @allure.title("[FS] ADCM Container")
 @pytest.fixture(scope="function")
-def adcm_fs(image, cmd_opts, request, adcm_api_credentials, adcm_is_upgradable: bool) -> Generator[ADCM, None, None]:
+def adcm_fs(image, cmd_opts, request, adcm_is_upgradable: bool) -> Generator[ADCM, None, None]:
     """Runs adcm container from the previously initialized image.
     Operates '--dontstop' option.
     Returns authorized instance of ADCM object
     """
-    yield from _adcm(image, cmd_opts, request, adcm_api_credentials, upgradable=adcm_is_upgradable)
+    yield from _adcm(image, cmd_opts, request, upgradable=adcm_is_upgradable)
 
 
 @allure.title("[SS] ADCM Container")
 @pytest.fixture(scope="session")
-def adcm_ss(image, cmd_opts, request, adcm_api_credentials, adcm_is_upgradable: bool) -> Generator[ADCM, None, None]:
+def adcm_ss(image, cmd_opts, request, adcm_is_upgradable: bool) -> Generator[ADCM, None, None]:
     """Runs adcm container from the previously initialized image.
     Operates '--dontstop' option.
     Returns authorized instance of ADCM object
     """
-    yield from _adcm(image, cmd_opts, request, adcm_api_credentials, upgradable=adcm_is_upgradable)
+    yield from _adcm(image, cmd_opts, request, upgradable=adcm_is_upgradable)
 
 
 @allure.title("[SS] ADCM upgradable flag")
