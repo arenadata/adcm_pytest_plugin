@@ -166,8 +166,26 @@ def _extract_error_from_ansible_stdout(log: str):
     ... NO MORE HOSTS LEFT *********
     ... ''')
     'TASK [failed task] ***\\ndatetime *********\\nfatal: [fqdn]: FAILED! => changed=false\\nmsg: captured\\n'
+    >>> this('''
+    ... TASK [first failed task] ***
+    ... datetime *********
+    ... fatal: [fqdn]: FAILED! => changed=false
+    ... msg: Assertion failed
+    ...
+    ... TASK [failed task] ***
+    ... datetime *********
+    ... fatal: [fqdn]: FAILED! => changed=false
+    ... msg: captured
+    ...
+    ... TASK [api : something] ***
+    ... datetime **********
+    ... ok: [adcm-cluster-adb-gw0-e330benhwqir]
+    ... msg: All assertions passed"
+    ... NO MORE HOSTS LEFT *********
+    ... ''')
+    'TASK [failed task] ***\\ndatetime *********\\nfatal: [fqdn]: FAILED! => changed=false\\nmsg: captured\\n'
     """
-    err_start = log.find("fatal:")
+    err_start = log.rfind("fatal:")
     if err_start > -1:
         task_name = log.rfind("TASK [", 0, err_start)
         task_marker = log.find("***", err_start)
