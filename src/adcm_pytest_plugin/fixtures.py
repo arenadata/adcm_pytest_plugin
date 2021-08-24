@@ -112,7 +112,7 @@ def image(request, cmd_opts, adcm_api_credentials, additional_adcm_init_config):
     else:
         docker_client = docker.from_env(timeout=120)
 
-    params = dict()
+    params = {}
     if cmd_opts.staticimage:
         params["repo"], params["tag"] = split_tag(cmd_opts.staticimage)
     # if image fixture was indirectly parametrized
@@ -274,7 +274,7 @@ def _get_if_type(if_ip):
     Get interface type from /sys/class/net/{if_name}/type
     """
     if_name = _get_if_name_by_ip(if_ip)
-    with open(f"/sys/class/net/{if_name}/type", "r") as file:
+    with open(f"/sys/class/net/{if_name}/type", "r", encoding="utf-8") as file:
         return file.readline().strip()
 
 

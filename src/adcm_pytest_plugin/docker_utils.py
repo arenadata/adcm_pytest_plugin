@@ -81,7 +81,7 @@ def is_docker() -> bool:
     """
     path = "/proc/self/cgroup"
     try:
-        with open(path) as file:
+        with open(path, encoding="utf-8") as file:
             for line in file:
                 if re.match(r"\d+:[\w=]+:/docker(-[ce]e)?/\w+", line):
                     return True
