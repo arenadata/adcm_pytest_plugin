@@ -14,11 +14,12 @@
 
 import os
 import random
+import re
 import string
 from contextlib import AbstractContextManager
 from inspect import getfullargspec
 from time import sleep, time
-from typing import Callable, Iterable, List, Tuple, Type, Union
+from typing import Callable, Iterable, List, Tuple, Type, Union, Optional
 
 import allure
 import pytest
@@ -26,6 +27,8 @@ from _pytest.fixtures import FixtureFunctionMarker, _FixtureFunction
 from _pytest.mark import MarkDecorator
 from adcm_client.base import ObjectNotFound
 from adcm_client.objects import Cluster, Host, Task
+from allure_commons.reporter import AllureReporter
+from allure_pytest.listener import AllureListener
 from decorator import decorator
 
 
@@ -455,3 +458,32 @@ def expectparam(type_: Type) -> Callable:
         return func(*args, **kwargs)
 
     return impl
+
+
+def allure_reporter(config) -> Optional[AllureReporter]:
+    """Get Allure Reporter from pytest plugins"""
+    listener: AllureListener = next(
+        filter(
+            lambda plugin: (isinstance(plugin, AllureListener)),
+            dict(config.pluginmanager.list_name_plugin()).values(),
+        ),
+        None,
+    )
+    return listener.allure_logger if listener else None
+
+
+def func_name_to_title(func_name):
+    """Translate test func name to human-readable title
+    >>> func_name_to_title("test_should_not_create_service_with_invalid_config")
+    'Should not create service with invalid config'
+    >>> func_name_to_title("test_parametrized[first_param-second_param]")
+    'Parametrized[first_param-second_param]'
+    >>> func_name_to_title("This is custom title")
+    'This is custom title'
+    """
+    found = re.findall(r"^test_(\w+)(\[.*])?", func_name)
+    if not found:
+        return func_name
+    func_name, params = found[0]
+    func_name = func_name.replace("_", " ").capitalize()
+    return func_name + params
