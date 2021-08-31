@@ -163,8 +163,9 @@ def pytest_runtest_makereport(item, call):
     """
     if hasattr(item, "callspec") and call.when == "setup":
         reporter = allure_reporter(item.config)
-        latest_test = reporter.get_test(None)
-        latest_test.name = func_name_to_title(latest_test.name)
+        if reporter:
+            latest_test = reporter.get_test(None)
+            latest_test.name = func_name_to_title(latest_test.name)
 
     # execute all other hooks to obtain the report object
     outcome = yield
