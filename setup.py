@@ -25,7 +25,7 @@ setup(
     # custom PyPI classifier for pytest plugins
     install_requires=[
         "pytest",
-        "docker",
+        "docker==5.0.0",
         "adcm_client>=2021.4.15.17",
         "allure-pytest>=2.9.42",
         "requests",
