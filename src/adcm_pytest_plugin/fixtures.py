@@ -14,7 +14,7 @@ import socket
 import time
 import uuid
 from contextlib import suppress
-from typing import Generator, Optional
+from typing import Generator
 
 import allure
 import docker
@@ -22,9 +22,7 @@ import ifaddr
 import pytest
 from _pytest.fixtures import SubRequest
 from adcm_client.objects import ADCMClient
-from allure_commons.reporter import AllureReporter
 from allure_commons.utils import uuid4
-from allure_pytest.listener import AllureListener
 from requests.exceptions import ReadTimeout as DockerReadTimeout
 
 from adcm_pytest_plugin import utils
@@ -39,7 +37,7 @@ from .docker_utils import (
     remove_docker_image,
     split_tag,
 )
-from .utils import check_mutually_exclusive
+from .utils import check_mutually_exclusive, allure_reporter
 
 DATADIR = utils.get_data_dir(__file__)
 
@@ -192,23 +190,11 @@ def _adcm(image, cmd_opts, request, upgradable=False) -> Generator[ADCM, None, N
     remove_container_volumes(adcm.container, docker_wrapper.client)
 
 
-def _allure_reporter(config) -> Optional[AllureReporter]:
-    """Get Allure Reporter from pytest plugins"""
-    listener: AllureListener = next(
-        filter(
-            lambda plugin: (isinstance(plugin, AllureListener)),
-            dict(config.pluginmanager.list_name_plugin()).values(),
-        ),
-        None,
-    )
-    return listener.allure_logger if listener else None
-
-
 @allure.step("Gather /adcm/data/ from ADCM container")
 def _attach_adcm_logs(request: SubRequest, adcm: ADCM):
     """Gather /adcm/data/ form the ADCM container and attach it to the Allure Report"""
     file_name = f"ADCM Log {request.node.name}_{time.time()}"
-    reporter = _allure_reporter(request.config)
+    reporter = allure_reporter(request.config)
     if reporter:
         test_result = reporter.get_test(uuid=None)
         with gather_adcm_data_from_container(adcm) as data:
@@ -231,7 +217,7 @@ def _attach_adcm_logs(request: SubRequest, adcm: ADCM):
 def _attach_adcm_url(request: SubRequest, adcm: ADCM):
     """Attach ADCM URL link to the Allure Report for the further access"""
     attachment_name = "ADCM URL"
-    reporter = _allure_reporter(request.config)
+    reporter = allure_reporter(request.config)
     if reporter:
         test_result = reporter.get_test(uuid=None)
         reporter.attach_data(

@@ -20,8 +20,9 @@ import requests
 from _pytest.config import Config
 from version_utils import rpm
 
-from .fixtures import *  # noqa: F401, F403
 from .docker_utils import split_tag
+from .fixtures import *  # noqa: F401, F403
+from .utils import func_name_to_title, allure_reporter
 
 options: Namespace = Namespace()
 
@@ -155,11 +156,17 @@ def _get_adcm_new_versions_tags(min_ver):
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
-def pytest_runtest_makereport(item):
+def pytest_runtest_makereport(item, call):
     """
     There is no default info about test stages execution available in pytest
     This hook is meant to store such info im metadata
     """
+    if hasattr(item, "callspec") and call.when == "setup":
+        reporter = allure_reporter(item.config)
+        if reporter:
+            latest_test = reporter.get_test(None)
+            latest_test.name = func_name_to_title(latest_test.name)
+
     # execute all other hooks to obtain the report object
     outcome = yield
     rep = outcome.get_result()
