@@ -24,7 +24,7 @@ class ADCMError(BuiltinLikeAssertionError):
         """Raise suitable ADCM error if possible"""
         __tracebackhide__ = True  # pylint: disable=unused-variable
 
-        if '500 Internal Server Error' in message:
+        if "500 Internal Server Error" in message:
             raise ADCMInternalServerError(message)
 
 
