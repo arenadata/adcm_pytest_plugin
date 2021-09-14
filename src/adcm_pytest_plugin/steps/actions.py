@@ -24,6 +24,7 @@ from adcm_client.base import ObjectNotFound
 from adcm_client.objects import Cluster, Service, Host, Task, Component, Provider
 
 from .asserts import assert_action_result
+from ..exceptions.adcm import ADCMError
 from ..plugin import options
 
 
@@ -216,7 +217,11 @@ def _run_action_and_assert_result(
         if rpm.compare_versions(obj.adcm_version, "2021.02.04.13") >= 0 and "verbose" not in kwargs:
             kwargs["verbose"] = options.verbose_actions  # pylint: disable=no-member
         obj.reread()
-        task = obj.action(name=action_name).run(**kwargs)
+        try:
+            task = obj.action(name=action_name).run(**kwargs)
+        except ErrorMessage as err:
+            ADCMError.raise_if_suitable(err.error.title)
+            raise ErrorMessage from err
         wait_for_task_and_assert_result(task=task, action_name=action_name, status=expected_status, timeout=timeout)
         return task
 
