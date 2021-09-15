@@ -221,7 +221,7 @@ def _run_action_and_assert_result(
             task = obj.action(name=action_name).run(**kwargs)
         except ErrorMessage as err:
             ADCMError.raise_if_suitable(err.error.title)
-            raise ErrorMessage from err
+            raise
         wait_for_task_and_assert_result(task=task, action_name=action_name, status=expected_status, timeout=timeout)
         return task
 
