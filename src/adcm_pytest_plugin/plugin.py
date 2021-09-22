@@ -172,9 +172,15 @@ def pytest_runtest_makereport(item, call):
     rep = outcome.get_result()
 
     # set a report attribute for each phase of a call, which can
-    # be "setup", "call", "teardown"
+    # be "collect", "setup", "call", "teardown"
+    possible_phases = ("collect", "setup", "call", "teardown")
+    phase_result_var_name_template = "rep_{phase}_passed"
+    # Xdist left env vars on worker before run new test on it. Clean possible env vars
+    for phase in possible_phases:
+        phase_var_name = phase_result_var_name_template.format(phase)
+        os.environ.pop(phase_var_name, None)
 
-    os.environ["rep_" + rep.when + "_passed"] = str(rep.passed)
+    os.environ[phase_result_var_name_template.format(rep.when)] = str(rep.passed)
     setattr(item, "rep_" + rep.when, rep)
 
 
