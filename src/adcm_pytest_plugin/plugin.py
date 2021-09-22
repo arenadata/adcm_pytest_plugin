@@ -177,10 +177,10 @@ def pytest_runtest_makereport(item, call):
     phase_result_var_name_template = "rep_{phase}_passed"
     # Xdist left env vars on worker before run new test on it. Clean possible env vars
     for phase in possible_phases:
-        phase_var_name = phase_result_var_name_template.format(phase)
+        phase_var_name = phase_result_var_name_template.format(phase=phase)
         os.environ.pop(phase_var_name, None)
 
-    os.environ[phase_result_var_name_template.format(rep.when)] = str(rep.passed)
+    os.environ[phase_result_var_name_template.format(phase=rep.when)] = str(rep.passed)
     setattr(item, "rep_" + rep.when, rep)
 
 
