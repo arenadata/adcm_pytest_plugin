@@ -35,7 +35,7 @@ def pytest_configure(config: Config):
         def some_func():
             adcm_image = options.adcm_image
     """
-    global options  # pylint: disable=global-statement,invalid-name
+    global options  # pylint: disable=global-statement,invalid-name,global-variable-not-assigned
     options.__dict__.update(config.option.__dict__)
 
 
@@ -149,7 +149,7 @@ def _get_adcm_new_versions_tags(min_ver):
     for tag in tags:
         if tag.isdigit():
             # convert to version format
-            version = "%s.%s.%s.%s" % (tag[:4], tag[4:6], tag[6:8], tag[8:10])
+            version = f"{tag[:4]}.{tag[4:6]}.{tag[6:8]}.{tag[8:10]}"
             # filter older versions
             if rpm.compare_versions(version, min_ver[:13]) != -1:
                 yield version.replace(".", "")

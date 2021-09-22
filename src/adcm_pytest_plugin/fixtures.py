@@ -102,7 +102,7 @@ def image(request, cmd_opts, adcm_api_credentials, additional_adcm_init_config):
     # pytest don't allow more convenient mechanisms to add mutually exclusive options.
     for opt_sets in mutually_exclusive_opts:
         if check_mutually_exclusive(cmd_opts, *opt_sets):
-            raise Exception("wrong using of import parameters %s are mutually exclusive" % ", ".join(opt_sets))
+            raise Exception(f"wrong using of import parameters {', '.join(opt_sets)} are mutually exclusive")
 
     pull = not cmd_opts.nopull
     if cmd_opts.remote_docker:
@@ -201,7 +201,7 @@ def _attach_adcm_logs(request: SubRequest, adcm: ADCM):
             reporter.attach_data(
                 uuid=uuid4(),
                 body=data,
-                name="{}.tgz".format(file_name),
+                name=f"{file_name}.tgz",
                 extension="tgz",
                 parent_uuid=test_result.uuid,
             )
@@ -209,7 +209,7 @@ def _attach_adcm_logs(request: SubRequest, adcm: ADCM):
         with gather_adcm_data_from_container(adcm) as data:
             allure.attach(
                 body=data,
-                name="{}.tgz".format(file_name),
+                name=f"{file_name}.tgz",
                 extension="tgz",
             )
 
