@@ -35,7 +35,7 @@ def pytest_configure(config: Config):
         def some_func():
             adcm_image = options.adcm_image
     """
-    global options  # pylint: disable=global-statement,invalid-name
+    global options  # pylint: disable=global-statement,invalid-name,global-variable-not-assigned
     options.__dict__.update(config.option.__dict__)
 
 
@@ -149,7 +149,7 @@ def _get_adcm_new_versions_tags(min_ver):
     for tag in tags:
         if tag.isdigit():
             # convert to version format
-            version = "%s.%s.%s.%s" % (tag[:4], tag[4:6], tag[6:8], tag[8:10])
+            version = f"{tag[:4]}.{tag[4:6]}.{tag[6:8]}.{tag[8:10]}"
             # filter older versions
             if rpm.compare_versions(version, min_ver[:13]) != -1:
                 yield version.replace(".", "")
@@ -172,9 +172,15 @@ def pytest_runtest_makereport(item, call):
     rep = outcome.get_result()
 
     # set a report attribute for each phase of a call, which can
-    # be "setup", "call", "teardown"
+    # be "collect", "setup", "call", "teardown"
+    possible_phases = ("collect", "setup", "call", "teardown")
+    phase_result_var_name_template = "rep_{phase}_passed"
+    # Xdist left env vars on worker before run new test on it. Clean possible env vars
+    for phase in possible_phases:
+        phase_var_name = phase_result_var_name_template.format(phase=phase)
+        os.environ.pop(phase_var_name, None)
 
-    os.environ["rep_" + rep.when + "_passed"] = str(rep.passed)
+    os.environ[phase_result_var_name_template.format(phase=rep.when)] = str(rep.passed)
     setattr(item, "rep_" + rep.when, rep)
 
 

@@ -242,7 +242,7 @@ def image_exists(repo: str, tag: str, dc: Optional[DockerClient] = None):
     if dc is None:
         dc = docker.from_env(timeout=120)
     try:
-        dc.images.get(name="{}:{}".format(repo, tag))
+        dc.images.get(name=f"{repo}:{tag}")
     except ImageNotFound:
         return False
     return True
@@ -370,7 +370,7 @@ class DockerWrapper:  # pylint: disable=too-few-public-methods
     def _run_container(self, config: ContainerConfig) -> Container:
         return (
             self.client.containers.run(
-                "{}:{}".format(config.image, config.tag),
+                f"{config.image}:{config.tag}",
                 ports={"8000": (config.bind_ip, config.bind_port)},
                 volumes=config.volumes,
                 remove=config.remove,

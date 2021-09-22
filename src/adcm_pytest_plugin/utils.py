@@ -271,7 +271,7 @@ def get_data_subdirs_as_parameters(filename: str, *subdirs) -> Tuple[List[str], 
     paths = []
     ids = []
     for subpath in sorted(os.listdir(dirname)):
-        paths.append("{}/{}".format(dirname, subpath))
+        paths.append(f"{dirname}/{subpath}")
         ids.append(subpath)
     return paths, ids
 
