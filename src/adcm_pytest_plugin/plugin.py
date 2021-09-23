@@ -25,6 +25,7 @@ from .fixtures import *  # noqa: F401, F403
 from .utils import func_name_to_title, allure_reporter
 
 options: Namespace = Namespace()
+_PHASE_RESULT_VAR_NAME_TEMPLATE = "rep_{phase}_passed"
 
 
 def pytest_configure(config: Config):
@@ -156,6 +157,19 @@ def _get_adcm_new_versions_tags(min_ver):
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
+def pytest_runtest_protocol():
+    """
+    Remove env vars before run test
+    """
+    possible_phases = ("setup", "call", "teardown")
+    # Xdist left env vars on worker before run new test on it. Clean possible env vars
+    for phase in possible_phases:
+        phase_var_name = _PHASE_RESULT_VAR_NAME_TEMPLATE.format(phase=phase)
+        os.environ.pop(phase_var_name, None)
+    yield
+
+
+@pytest.hookimpl(tryfirst=True, hookwrapper=True)
 def pytest_runtest_makereport(item, call):
     """
     There is no default info about test stages execution available in pytest
@@ -172,15 +186,8 @@ def pytest_runtest_makereport(item, call):
     rep = outcome.get_result()
 
     # set a report attribute for each phase of a call, which can
-    # be "collect", "setup", "call", "teardown"
-    possible_phases = ("collect", "setup", "call", "teardown")
-    phase_result_var_name_template = "rep_{phase}_passed"
-    # Xdist left env vars on worker before run new test on it. Clean possible env vars
-    for phase in possible_phases:
-        phase_var_name = phase_result_var_name_template.format(phase=phase)
-        os.environ.pop(phase_var_name, None)
-
-    os.environ[phase_result_var_name_template.format(phase=rep.when)] = str(rep.passed)
+    # be "setup", "call", "teardown"
+    os.environ[_PHASE_RESULT_VAR_NAME_TEMPLATE.format(phase=rep.when)] = str(rep.passed)
     setattr(item, "rep_" + rep.when, rep)
 
 
