@@ -19,9 +19,9 @@ from typing import List
 import pytest
 import requests
 from _pytest.config import Config
+from docker.utils import parse_repository_tag
 from version_utils import rpm
 
-from .docker_utils import split_tag
 from .fixtures import *  # noqa: F401, F403
 from .utils import func_name_to_title, allure_reporter
 
@@ -137,7 +137,7 @@ def parametrized_by_adcm_version(adcm_min_version=None, adcm_images=None):
         params = [[repo, tag] for tag in _get_adcm_new_versions_tags(adcm_min_version)]
         ids = list(map(lambda x: x[1] if x[1] is not None else "latest", params))
     elif adcm_images:
-        params = [[repo, tag] for repo, tag in map(split_tag, adcm_images)]
+        params = [[repo, tag] for repo, tag in map(parse_repository_tag, adcm_images)]
         ids = adcm_images
     return params, ids
 

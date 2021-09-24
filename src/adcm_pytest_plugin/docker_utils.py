@@ -35,6 +35,7 @@ from coreapi.exceptions import ErrorMessage
 from docker import DockerClient
 from docker.errors import APIError, ImageNotFound, NotFound
 from docker.models.containers import Container
+from docker.utils import parse_repository_tag
 from retry.api import retry_call
 
 from .utils import random_string
@@ -258,15 +259,11 @@ def split_tag(image_name: str):
     ('fedora/httpd', '')
     >>> split_tag('fedora/httpd:version1.0')
     ('fedora/httpd', 'version1.0')
+    >>> split_tag('fedora/httpd@sha256:12345')
+    ('fedora/httpd', 'sha256:12345')
     """
-    image = image_name.split(":")
-    if len(image) > 1:
-        image_repo = image[0]
-        image_tag = image[1]
-    else:
-        image_repo = image[0]
-        image_tag = None
-    return image_repo, image_tag
+    warnings.warn("Please use parse_repository_tag from docker.utils", DeprecationWarning)
+    return parse_repository_tag(image_name)
 
 
 def _wait_for_adcm_container_init(container, container_ip, port, timeout=120):
@@ -305,6 +302,17 @@ class ContainerConfig:
         self.tag = self.tag or "latest"
         self.bind_ip = self.bind_ip or DEFAULT_IP
         self.labels = self.labels or {}
+
+    @property
+    def full_image(self) -> str:
+        """Join image and tag"""
+        if not self.tag:
+            full_image = self.image
+        elif self.tag.startswith("sha256:"):
+            full_image = f"{self.image}@{self.tag}"
+        else:
+            full_image = f"{self.image}:{self.tag}"
+        return full_image
 
 
 class DockerWrapper:  # pylint: disable=too-few-public-methods
@@ -370,7 +378,7 @@ class DockerWrapper:  # pylint: disable=too-few-public-methods
     def _run_container(self, config: ContainerConfig) -> Container:
         return (
             self.client.containers.run(
-                f"{config.image}:{config.tag}",
+                config.full_image,
                 ports={"8000": (config.bind_ip, config.bind_port)},
                 volumes=config.volumes,
                 remove=config.remove,

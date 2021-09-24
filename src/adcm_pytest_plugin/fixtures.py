@@ -23,6 +23,7 @@ import pytest
 from _pytest.fixtures import SubRequest
 from adcm_client.objects import ADCMClient
 from allure_commons.utils import uuid4
+from docker.utils import parse_repository_tag
 from requests.exceptions import ReadTimeout as DockerReadTimeout
 
 from adcm_pytest_plugin import utils
@@ -35,7 +36,6 @@ from .docker_utils import (
     is_docker,
     remove_container_volumes,
     remove_docker_image,
-    split_tag,
 )
 from .utils import check_mutually_exclusive, allure_reporter
 
@@ -112,14 +112,14 @@ def image(request, cmd_opts, adcm_api_credentials, additional_adcm_init_config):
 
     params = {}
     if cmd_opts.staticimage:
-        params["repo"], params["tag"] = split_tag(cmd_opts.staticimage)
+        params["repo"], params["tag"] = parse_repository_tag(cmd_opts.staticimage)
     # if image fixture was indirectly parametrized
     # use 'adcm_repo' and 'adcm_tag' from parametrisation
     if hasattr(request, "param"):
         params["adcm_repo"], params["adcm_tag"] = request.param
     # if there is no parametrization check if adcm_image option is passed
     elif cmd_opts.adcm_image:
-        params["adcm_repo"], params["adcm_tag"] = split_tag(cmd_opts.adcm_image)
+        params["adcm_repo"], params["adcm_tag"] = parse_repository_tag(cmd_opts.adcm_image)
 
     init_image = ADCMInitializer(
         pull=pull,
