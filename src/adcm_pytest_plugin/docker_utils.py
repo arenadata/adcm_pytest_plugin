@@ -258,8 +258,13 @@ def split_tag(image_name: str):
     ('fedora/httpd', '')
     >>> split_tag('fedora/httpd:version1.0')
     ('fedora/httpd', 'version1.0')
+    >>> split_tag('fedora/httpd@sha256:12345')
+    ('fedora/httpd', 'sha256:12345')
     """
-    image = image_name.split(":")
+    if "@" in image_name:
+        image = image_name.split("@")
+    else:
+        image = image_name.split(":")
     if len(image) > 1:
         image_repo = image[0]
         image_tag = image[1]
