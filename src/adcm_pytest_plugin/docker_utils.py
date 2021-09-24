@@ -35,6 +35,7 @@ from coreapi.exceptions import ErrorMessage
 from docker import DockerClient
 from docker.errors import APIError, ImageNotFound, NotFound
 from docker.models.containers import Container
+from docker.utils import parse_repository_tag
 from retry.api import retry_call
 
 from .utils import random_string
@@ -261,17 +262,8 @@ def split_tag(image_name: str):
     >>> split_tag('fedora/httpd@sha256:12345')
     ('fedora/httpd', 'sha256:12345')
     """
-    if "@" in image_name:
-        image = image_name.split("@")
-    else:
-        image = image_name.split(":")
-    if len(image) > 1:
-        image_repo = image[0]
-        image_tag = image[1]
-    else:
-        image_repo = image[0]
-        image_tag = None
-    return image_repo, image_tag
+    warnings.warn("Please use parse_repository_tag from docker.utils", DeprecationWarning)
+    return parse_repository_tag(image_name)
 
 
 def _wait_for_adcm_container_init(container, container_ip, port, timeout=120):
