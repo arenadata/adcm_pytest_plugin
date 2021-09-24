@@ -142,18 +142,23 @@ def parametrized_by_adcm_version(adcm_min_version=None, adcm_images=None):
 
 
 def _get_adcm_new_versions_tags(min_ver):
-
     tags = requests.get("https://hub.arenadata.io/v2/adcm/adcm/tags/list").json()["tags"]
     # remove possible duplicates
     # sort to ensure same order for all xdist workers
     tags = sorted(list(set(tags)))
     for tag in tags:
+        # make versions with and without dots uniform
+        tag = tag.replace(".", "")
         if tag.isdigit():
             # convert to version format
             version = f"{tag[:4]}.{tag[4:6]}.{tag[6:8]}.{tag[8:10]}"
             # filter older versions
             if rpm.compare_versions(version, min_ver[:13]) != -1:
-                yield version.replace(".", "")
+                # since "2021.05.26.12" we have tag with dots for some reason
+                if rpm.compare_versions(version, "2021.05.26.12") != -1:
+                    yield version
+                else:
+                    yield version.replace(".", "")
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
