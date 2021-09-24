@@ -303,6 +303,17 @@ class ContainerConfig:
         self.bind_ip = self.bind_ip or DEFAULT_IP
         self.labels = self.labels or {}
 
+    @property
+    def full_image(self) -> str:
+        """Join image and tag"""
+        if not self.tag:
+            full_image = self.image
+        elif self.tag.startswith("sha256:"):
+            full_image = f"{self.image}@{self.tag}"
+        else:
+            full_image = f"{self.image}:{self.tag}"
+        return full_image
+
 
 class DockerWrapper:  # pylint: disable=too-few-public-methods
     """Class for connection to local docker daemon and spawn ADCM instances."""
@@ -367,7 +378,7 @@ class DockerWrapper:  # pylint: disable=too-few-public-methods
     def _run_container(self, config: ContainerConfig) -> Container:
         return (
             self.client.containers.run(
-                f"{config.image}:{config.tag}",
+                config.full_image,
                 ports={"8000": (config.bind_ip, config.bind_port)},
                 volumes=config.volumes,
                 remove=config.remove,
