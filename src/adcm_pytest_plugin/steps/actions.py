@@ -13,6 +13,7 @@
 """
 Common test steps with actions
 """
+import re
 from contextlib import contextmanager
 from difflib import get_close_matches
 from typing import Union
@@ -115,63 +116,98 @@ def _extract_error_from_ansible_stderr(stderr: str):
 def _extract_error_from_ansible_stdout(log: str):
     """
     Extract ansible error message from ansible stdout log
-
     >>> this = _extract_error_from_ansible_stdout
-    >>> this("fatal: Some ERROR\\nTASK [api : something] **********")
-    'fatal: Some ERROR'
-    >>> this('''
-    ... TASK [api : something] ***
-    ... datetime **********
-    ... ok: [adcm-cluster-adb-gw0-e330benhwqir]
-    ... msg: All assertions passed"
-    ... ''')
-    ''
-    >>> this('''
-    ... TASK [api : something] ***
-    ... datetime **********
-    ... ok: [adcm-cluster-adb-gw0-e330benhwqir]
-    ... msg: All assertions passed"
-    ...
-    ... TASK [failed task] ***
-    ... datetime *********
-    ... fatal: [fqdn]: FAILED! => changed=false
-    ... msg: Assertion failed
-    ... NO MORE HOSTS LEFT *********
-    ... ''')
-    'TASK [failed task] ***\\ndatetime *********\\nfatal: [fqdn]: FAILED! => changed=false\\nmsg: Assertion failed'
-    >>> this('''
-    ... TASK [ignoring failed task] ***
-    ... datetime *********
-    ... fatal: [fqdn]: FAILED! => changed=false
-    ... msg: Assertion failed
-    ... ...ignoring
-    ... NO MORE HOSTS LEFT *********
-    ... ''')
-    ''
-    >>> this('''
-    ... TASK [ignoring failed task] ***
-    ... datetime *********
-    ... fatal: [fqdn]: FAILED! => changed=false
-    ... msg: Assertion failed
-    ... ...ignoring
-    ...
-    ... TASK [failed task] ***
-    ... datetime *********
-    ... fatal: [fqdn]: FAILED! => changed=false
-    ... msg: captured
-    ...
-    ... TASK [api : something] ***
-    ... datetime **********
-    ... ok: [adcm-cluster-adb-gw0-e330benhwqir]
-    ... msg: All assertions passed"
-    ... NO MORE HOSTS LEFT *********
-    ... ''')
-    'TASK [failed task] ***\\ndatetime *********\\nfatal: [fqdn]: FAILED! => changed=false\\nmsg: captured\\n'
     >>> this('''
     ... TASK [first failed task] ***
+    ... datetime *****
+    ... fatal: [fqdn]: FAILED! => changed=false
+    ... msg: 2
+    ...
+    ... TASK [failed task] ***
+    ... datetime *****
+    ... fatal: [fqdn]: FAILED! => changed=false
+    ... msg: 1
+    ...
+    ... TASK [api : something] ***
+    ... datetime ***
+    ... ok: [fqdn]
+    ... msg: All assertions passed"
+    ... NO MORE HOSTS LEFT *********
+    ... PLAY RECAP *********************************************************************
+    ... host-1 : ok=7    changed=0    failed=0    skipped=3    rescued=0    ignored=0
+    ... host-2 : ok=7    changed=0    failed=0    skipped=3    rescued=0    ignored=0
+    ... host-3 : ok=20   changed=0    failed=2    skipped=5    rescued=0    ignored=0
+    ... ''')
+    'TASK [first failed task] ***\\ndatetime *****\\nfatal: [fqdn]: FAILED! => changed=false\\nmsg: 2\\n'
+    >>> this('''
+    ... TASK [first failed task] ***
+    ... datetime *****
+    ... fatal: [fqdn]: FAILED! => changed=false
+    ... msg: 2
+    ...
+    ... TASK [failed task] ***
+    ... datetime *****
+    ... fatal: [fqdn]: FAILED! => changed=false
+    ... msg: 1
+    ...
+    ... TASK [api : something] ***
+    ... datetime ***
+    ... ok: [fqdn]
+    ... msg: All assertions passed"
+    ... NO MORE HOSTS LEFT *********
+    ... PLAY RECAP *********************************************************************
+    ... host-1 : ok=7    changed=0    failed=0    skipped=3    rescued=1    ignored=0
+    ... host-2 : ok=7    changed=0    failed=0    skipped=3    rescued=0    ignored=0
+    ... host-3 : ok=20   changed=0    failed=2    skipped=5    rescued=0    ignored=0
+    ... ''')
+    'TASK [failed task] ***\\ndatetime *****\\nfatal: [fqdn]: FAILED! => changed=false\\nmsg: 1\\n'
+    """
+    rescued = _get_rescued_count_from_log(log)
+    failed_tasks = _get_all_fatal_from_ansible_stdout(log)
+    return failed_tasks[rescued]
+
+
+def _get_all_fatal_from_ansible_stdout(log: str):
+    """
+    Get all TASKS with fatal status from ansible log
+    >>> this = _get_all_fatal_from_ansible_stdout
+    >>> this("fatal: Some ERROR\\nTASK [api : something] **********")
+    ['fatal: Some ERROR']
+    >>> this('''
+    ... TASK [api : something] ***
+    ... datetime **********
+    ... ok: [adcm-cluster-adb-gw0-e330benhwqir]
+    ... msg: All assertions passed"
+    ... ''')
+    []
+    >>> this('''
+    ... TASK [api : something] ***
+    ... datetime **********
+    ... ok: [adcm-cluster-adb-gw0-e330benhwqir]
+    ... msg: All assertions passed"
+    ...
+    ... TASK [failed task] ***
     ... datetime *********
     ... fatal: [fqdn]: FAILED! => changed=false
     ... msg: Assertion failed
+    ... NO MORE HOSTS LEFT *********
+    ... ''')
+    ['TASK [failed task] ***\\ndatetime *********\\nfatal: [fqdn]: FAILED! => changed=false\\nmsg: Assertion failed']
+    >>> this('''
+    ... TASK [ignoring failed task] ***
+    ... datetime *********
+    ... fatal: [fqdn]: FAILED! => changed=false
+    ... msg: Assertion failed
+    ... ...ignoring
+    ... NO MORE HOSTS LEFT *********
+    ... ''')
+    []
+    >>> this('''
+    ... TASK [ignoring failed task] ***
+    ... datetime *********
+    ... fatal: [fqdn]: FAILED! => changed=false
+    ... msg: Assertion failed
+    ... ...ignoring
     ...
     ... TASK [failed task] ***
     ... datetime *********
@@ -184,20 +220,66 @@ def _extract_error_from_ansible_stdout(log: str):
     ... msg: All assertions passed"
     ... NO MORE HOSTS LEFT *********
     ... ''')
-    'TASK [failed task] ***\\ndatetime *********\\nfatal: [fqdn]: FAILED! => changed=false\\nmsg: captured\\n'
+    ['TASK [failed task] ***\\ndatetime *********\\nfatal: [fqdn]: FAILED! => changed=false\\nmsg: captured\\n']
+    >>> this('''
+    ... TASK [first failed task] ***
+    ... datetime *****
+    ... fatal: [fqdn]: FAILED! => changed=false
+    ... msg: 2
+    ...
+    ... TASK [failed task] ***
+    ... datetime *****
+    ... fatal: [fqdn]: FAILED! => changed=false
+    ... msg: 1
+    ...
+    ... TASK [api : something] ***
+    ... datetime ***
+    ... ok: [fqdn]
+    ... msg: All assertions passed"
+    ... NO MORE HOSTS LEFT *********
+    ... ''')
+    ['TASK [first failed task] ***\\ndatetime *****\\nfatal: [fqdn]: FAILED! => changed=false\\nmsg: 2\\n', \
+'TASK [failed task] ***\\ndatetime *****\\nfatal: [fqdn]: FAILED! => changed=false\\nmsg: 1\\n']
     """
-    err_start = log.rfind("fatal:")
-    if err_start > -1:
-        task_name = log.rfind("TASK [", 0, err_start)
+    fatal_tasks = []
+    err_start = -2
+    while (err_start := log.find("fatal:", err_start + 2)) > -1:
+        task_name_start = log.rfind("TASK [", 0, err_start)
         task_marker = log.find("***", err_start)
         err_end = log.rfind("\n", 0, task_marker)
-        if task_name > -1:
-            err_start = task_name
-        error_text = log[err_start:err_end]
-        if "...ignoring" in error_text:
-            return _extract_error_from_ansible_stdout(log.replace(error_text, ""))
-        return error_text
-    return ""
+        error_text = log[task_name_start if task_name_start > -1 else err_start : err_end]
+        if "...ignoring" not in error_text:
+            fatal_tasks.append(error_text)
+    return fatal_tasks
+
+
+def _get_rescued_count_from_log(log: str):
+    """
+    Get overall count of rescued tasks
+    >>> this = _get_rescued_count_from_log
+    >>> this('''
+    ... PLAY RECAP *********************************************************************
+    ... host-1 : ok=7    changed=0    failed=0    skipped=3    rescued=0    ignored=0
+    ... host-2 : ok=7    changed=0    failed=0    skipped=3    rescued=0    ignored=0
+    ... host-3 : ok=20   changed=0    failed=2    skipped=5    rescued=0    ignored=0
+    ... ''')
+    0
+    >>> this('''
+    ... PLAY RECAP *********************************************************************
+    ... host-1 : ok=7    changed=0    failed=0    skipped=3    rescued=1    ignored=0
+    ... host-2 : ok=7    changed=0    failed=0    skipped=3    rescued=1    ignored=0
+    ... host-3 : ok=20   changed=0    failed=2    skipped=5    rescued=0    ignored=0
+    ... ''')
+    2
+    >>> this('''
+    ... PLAY RECAP *********************************************************************
+    ... host-1 : ok=7    changed=0    failed=0    skipped=3    rescued=0    ignored=0
+    ... host-2 : ok=7    changed=0    failed=0    skipped=3    rescued=0    ignored=0
+    ... host-3 : ok=20   changed=0    failed=2    skipped=5    rescued=5    ignored=0
+    ... ''')
+    5
+    """
+    return sum(map(int, re.findall(r"rescued=(\d+)", log)))
 
 
 def _run_action_and_assert_result(
