@@ -161,10 +161,22 @@ def _extract_error_from_ansible_stdout(log: str):
     ... host-3 : ok=20   changed=0    failed=2    skipped=5    rescued=0    ignored=0
     ... ''')
     'TASK [failed task] ***\\ndatetime *****\\nfatal: [fqdn]: FAILED! => changed=false\\nmsg: 1\\n'
+    >>> this('''
+    ... TASK [api : something] ***
+    ... datetime ***
+    ... ok: [fqdn]
+    ... msg: All assertions passed"
+    ... NO MORE HOSTS LEFT *********
+    ... PLAY RECAP *********************************************************************
+    ... host-1 : ok=7    changed=0    failed=0    skipped=3    rescued=1    ignored=0
+    ... host-2 : ok=7    changed=0    failed=0    skipped=3    rescued=0    ignored=0
+    ... host-3 : ok=20   changed=0    failed=2    skipped=5    rescued=0    ignored=0
+    ... ''')
+    ''
     """
     rescued = _get_rescued_count_from_log(log)
     failed_tasks = _get_all_fatal_from_ansible_stdout(log)
-    return failed_tasks[rescued]
+    return failed_tasks[rescued] if len(failed_tasks) > rescued else "\n".join(failed_tasks)
 
 
 def _get_all_fatal_from_ansible_stdout(log: str):
