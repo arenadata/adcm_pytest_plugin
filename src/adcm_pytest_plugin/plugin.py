@@ -145,7 +145,10 @@ def parametrized_by_adcm_version(adcm_min_version=None, adcm_images=None):
 def _get_adcm_tags():
     # remove possible duplicates
     # sort to ensure same order for all xdist workers
-    return sorted(list(set(requests.get("https://hub.arenadata.io/v2/adcm/adcm/tags/list").json()["tags"])))
+    return sorted(
+        list(set(requests.get("https://hub.arenadata.io/v2/adcm/adcm/tags/list").json()["tags"])),
+        key=lambda x: x.replace(".", ""),
+    )
 
 
 def _filter_adcm_versions_from_tags(adcm_tags: List[str], min_ver: str):
