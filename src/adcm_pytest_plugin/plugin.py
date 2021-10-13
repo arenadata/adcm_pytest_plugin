@@ -166,8 +166,8 @@ def _filter_adcm_versions_from_tags(adcm_tags: List[str], min_ver: str) -> Itera
     """
     return filter(
         lambda x: (tag := x.replace(".", ""))
-        and (tag.isdigit())
-        and (rpm.compare_versions(f"{tag[:4]}.{tag[4:6]}.{tag[6:8]}.{tag[8:10]}", min_ver[:13]) != -1),
+        and (tag.isdigit())  # noqa: W503
+        and (rpm.compare_versions(f"{tag[:4]}.{tag[4:6]}.{tag[6:8]}.{tag[8:10]}", min_ver[:13]) != -1),  # noqa: W503
         adcm_tags,
     )
 
