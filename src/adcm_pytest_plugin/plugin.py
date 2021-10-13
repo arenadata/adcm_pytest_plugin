@@ -14,7 +14,7 @@
 # pylint: disable=wildcard-import,unused-wildcard-import
 import os
 from argparse import Namespace
-from typing import List
+from typing import List, Iterator
 
 import pytest
 import requests
@@ -142,16 +142,17 @@ def parametrized_by_adcm_version(adcm_min_version=None, adcm_images=None):
     return params, ids
 
 
-def _get_adcm_tags():
+def _get_adcm_tags() -> List[str]:
     # remove possible duplicates
     # sort to ensure same order for all xdist workers
+    # sorted of set returns list
     return sorted(
-        list(set(requests.get("https://hub.arenadata.io/v2/adcm/adcm/tags/list").json()["tags"])),
+        set(requests.get("https://hub.arenadata.io/v2/adcm/adcm/tags/list").json()["tags"]),
         key=lambda x: x.replace(".", ""),
     )
 
 
-def _filter_adcm_versions_from_tags(adcm_tags: List[str], min_ver: str):
+def _filter_adcm_versions_from_tags(adcm_tags: List[str], min_ver: str) -> Iterator[str]:
     """
     >>> this = _filter_adcm_versions_from_tags
     >>> list(this(["2021021506","2021030114","2021031007","latest","2021.05.26.12","2021.06.17.06"], "2019.03.01.14"))
@@ -163,22 +164,15 @@ def _filter_adcm_versions_from_tags(adcm_tags: List[str], min_ver: str):
     >>> list(this(["2021021506","2021030114","2021031007","latest","2021.05.26.12","2021.06.17.06"], "2022.05.26.12"))
     []
     """
-    for tag in adcm_tags:
-        # make versions with and without dots uniform
-        tag = tag.replace(".", "")
-        if tag.isdigit():
-            # convert to version format
-            version = f"{tag[:4]}.{tag[4:6]}.{tag[6:8]}.{tag[8:10]}"
-            # filter older versions
-            if rpm.compare_versions(version, min_ver[:13]) != -1:
-                # since "2021.05.26.12" we have tag with dots for some reason
-                if rpm.compare_versions(version, "2021.05.26.12") != -1:
-                    yield version
-                else:
-                    yield version.replace(".", "")
+    return filter(
+        lambda x: (tag := x.replace(".", ""))
+        and (tag.isdigit())
+        and (rpm.compare_versions(f"{tag[:4]}.{tag[4:6]}.{tag[6:8]}.{tag[8:10]}", min_ver[:13]) != -1),
+        adcm_tags,
+    )
 
 
-def _get_adcm_new_versions_tags(min_ver):
+def _get_adcm_new_versions_tags(min_ver: str):
     tags = _get_adcm_tags()
     for version in _filter_adcm_versions_from_tags(tags, min_ver):
         yield version
