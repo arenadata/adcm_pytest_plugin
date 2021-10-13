@@ -143,9 +143,9 @@ def parametrized_by_adcm_version(adcm_min_version=None, adcm_images=None):
 
 
 def _get_adcm_tags() -> List[str]:
+    """Return sorted list of unique ADCM tags from hub.arenadata.io (newest tag is last)"""
     # remove possible duplicates
     # sort to ensure same order for all xdist workers
-    # sorted of set returns list
     return sorted(
         set(requests.get("https://hub.arenadata.io/v2/adcm/adcm/tags/list").json()["tags"]),
         key=lambda x: x.replace(".", ""),
