@@ -146,10 +146,11 @@ def _get_adcm_tags() -> List[str]:
     """Return sorted list of unique ADCM tags from hub.arenadata.io (newest tag is last)"""
     # remove possible duplicates
     # sort to ensure same order for all xdist workers
-    return sorted(
-        set(requests.get("https://hub.arenadata.io/v2/adcm/adcm/tags/list").json()["tags"]),
-        key=lambda x: x.replace(".", ""),
-    )
+    raw_tags = requests.get("https://hub.arenadata.io/v2/adcm/adcm/tags/list").json()["tags"]
+    unique_tags = {tag for tag in raw_tags if '.' not in tag}
+    # we have some versions duplicates where one element is with dots and another without
+    unique_tags |= {tag for tag in raw_tags if tag not in unique_tags and tag.replace('.', '') not in unique_tags}
+    return sorted(unique_tags, key=lambda x: x.replace(".", ""))
 
 
 def _filter_adcm_versions_from_tags(adcm_tags: List[str], min_ver: str) -> Iterator[str]:
