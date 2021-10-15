@@ -145,7 +145,7 @@ def parametrized_by_adcm_version(adcm_min_version=None, adcm_images=None):
 def _get_unique_sorted_tags(tags: List[str]) -> List[str]:
     """
     Get unique tags from list as sorted list
-        (20212012 and 2021.20.12 are considered the same and only one of them (first in list) is returned)
+        (20212012 and 2021.20.12 are considered the same and only one of them (without dots) is returned)
 
     >>> this = _get_unique_sorted_tags
     >>> this(['20201210', '20190610', '2020.11.10'])
@@ -155,7 +155,7 @@ def _get_unique_sorted_tags(tags: List[str]) -> List[str]:
     >>> this(['20201210', '20190610', '20201110', '2019.05.30', '2020.11.10', '2019.10.16'])
     ['2019.05.30', '20190610', '2019.10.16', '20201110', '20201210']
     >>> this(['20201210', '20190610', '2020.11.10', '20201110', '2019.05.30',  '2019.10.16'])
-    ['2019.05.30', '20190610', '2019.10.16', '2020.11.10', '20201210']
+    ['2019.05.30', '20190610', '2019.10.16', '20201110', '20201210']
     """
 
     unique_tags = {tag for tag in tags if "." not in tag}
