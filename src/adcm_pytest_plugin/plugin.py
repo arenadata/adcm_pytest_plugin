@@ -142,15 +142,29 @@ def parametrized_by_adcm_version(adcm_min_version=None, adcm_images=None):
     return params, ids
 
 
-def _get_adcm_tags() -> List[str]:
-    """Return sorted list of unique ADCM tags from hub.arenadata.io (newest tag is last)"""
-    # remove possible duplicates
-    # sort to ensure same order for all xdist workers
-    raw_tags = requests.get("https://hub.arenadata.io/v2/adcm/adcm/tags/list").json()["tags"]
-    unique_tags = {tag for tag in raw_tags if "." not in tag}
-    # we have some versions duplicates where one element is with dots and another without
-    unique_tags |= {tag for tag in raw_tags if tag not in unique_tags and tag.replace(".", "") not in unique_tags}
+def _get_unique_sorted_tags(tags: List[str]) -> List[str]:
+    """
+    Get unique tags from list as sorted list
+        (20212012 and 2021.20.12 are considered the same and only one of them (first in list) is returned)
+
+    >>> this = _get_unique_sorted_tags
+    >>> this(['20201210', '20190610', '2020.11.10'])
+    ['20190610', '2020.11.10', '20201210']
+    >>> this(['2020.12.10', '20190610', '20201110'])
+    ['20190610', '20201110', '2020.12.10']
+    >>> this(['20201210', '20190610', '20201110', '2019.05.30', '2020.11.10', '2019.10.16'])
+    ['2019.05.30', '20190610', '2019.10.16', '20201110', '20201210']
+    """
+
+    unique_tags = {tag for tag in tags if "." not in tag}
+    # we have duplicates for some versions where one element is with dots and another without
+    unique_tags |= {tag for tag in tags if tag not in unique_tags and tag.replace(".", "") not in unique_tags}
     return sorted(unique_tags, key=lambda x: x.replace(".", ""))
+
+
+def _get_adcm_tags() -> List[str]:
+    """Return unsorted list of ADCM tags from hub.arenadata.io (newest tag is last)"""
+    return requests.get("https://hub.arenadata.io/v2/adcm/adcm/tags/list").json()["tags"]
 
 
 def _filter_adcm_versions_from_tags(adcm_tags: List[str], min_ver: str) -> Iterator[str]:
@@ -174,7 +188,10 @@ def _filter_adcm_versions_from_tags(adcm_tags: List[str], min_ver: str) -> Itera
 
 
 def _get_adcm_new_versions_tags(min_ver: str):
-    tags = _get_adcm_tags()
+    """Get ADCM tags greater or equal than min_ver"""
+    # remove possible duplicates
+    # sort to ensure same order for all xdist workers
+    tags = _get_unique_sorted_tags(_get_adcm_tags())
     for version in _filter_adcm_versions_from_tags(tags, min_ver):
         yield version
 
