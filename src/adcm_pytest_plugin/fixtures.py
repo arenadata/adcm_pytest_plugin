@@ -48,6 +48,7 @@ __all__ = [
     "adcm_ss",
     "adcm_ms",
     "adcm_is_upgradable",
+    "adcm_https",
     "sdk_client_ms",
     "sdk_client_fs",
     "sdk_client_ss",
@@ -78,7 +79,7 @@ def additional_adcm_init_config() -> dict:
 # pylint: disable=W0621
 @allure.title("ADCM Image")
 @pytest.fixture(scope="session")
-def image(request, cmd_opts, adcm_api_credentials, additional_adcm_init_config):
+def image(request, cmd_opts, adcm_api_credentials, additional_adcm_init_config, adcm_https):
     """That fixture creates ADCM container, waits until
     a database becomes initialised and stores that as images
     with random tag and name local/adcminit
@@ -121,15 +122,21 @@ def image(request, cmd_opts, adcm_api_credentials, additional_adcm_init_config):
     elif cmd_opts.adcm_image:
         params["adcm_repo"], params["adcm_tag"] = parse_repository_tag(cmd_opts.adcm_image)
 
-    init_image = ADCMInitializer(
+    if adcm_https:
+        params["generate_certs"] = True
+
+    initializer = ADCMInitializer(
         pull=pull,
         dc=docker_client,
         adcm_api_credentials=adcm_api_credentials,
         **params,
         **additional_adcm_init_config,
-    ).get_initialized_adcm_image()
+    )
+    init_image = initializer.get_initialized_adcm_image()
 
     yield init_image["repo"], init_image["tag"]
+
+    initializer.cleanup()
 
     if cmd_opts.dontstop or cmd_opts.staticimage:
         return  # leave image intact
@@ -137,7 +144,7 @@ def image(request, cmd_opts, adcm_api_credentials, additional_adcm_init_config):
     remove_docker_image(**init_image, dc=docker_client)
 
 
-def _adcm(image, cmd_opts, request, upgradable=False) -> Generator[ADCM, None, None]:
+def _adcm(image, cmd_opts, request, upgradable=False, https=False) -> Generator[ADCM, None, None]:
     repo, tag = image
     labels = {"pytest_node_id": request.node.nodeid}
     # this option can be passed from private adcm-pytest-tools (check its README.md for more info)
@@ -165,7 +172,14 @@ def _adcm(image, cmd_opts, request, upgradable=False) -> Generator[ADCM, None, N
     adcm = ADCM(
         docker_wrapper=docker_wrapper,
         container_config=ContainerConfig(
-            image=repo, tag=tag, pull=False, bind_ip=ip, labels=labels, volumes=volumes, docker_url=docker_url
+            image=repo,
+            tag=tag,
+            pull=False,
+            bind_ip=ip,
+            labels=labels,
+            volumes=volumes,
+            docker_url=docker_url,
+            https=https,
         ),
     )
 
@@ -269,37 +283,46 @@ def _get_if_type(if_ip):
 ##################################################
 @allure.title("[MS] ADCM Container")
 @pytest.fixture(scope="module")
-def adcm_ms(image, cmd_opts, request, adcm_is_upgradable: bool) -> Generator[ADCM, None, None]:
+def adcm_ms(image, cmd_opts, request, adcm_is_upgradable: bool, adcm_https: bool) -> Generator[ADCM, None, None]:
     """Runs adcm container from the previously initialized image.
     Operates '--dontstop' option.
     Returns authorized instance of ADCM object
     """
-    yield from _adcm(image, cmd_opts, request, upgradable=adcm_is_upgradable)
+    yield from _adcm(image, cmd_opts, request, upgradable=adcm_is_upgradable, https=adcm_https)
 
 
 @allure.title("[FS] ADCM Container")
 @pytest.fixture(scope="function")
-def adcm_fs(image, cmd_opts, request, adcm_is_upgradable: bool) -> Generator[ADCM, None, None]:
+def adcm_fs(image, cmd_opts, request, adcm_is_upgradable: bool, adcm_https: bool) -> Generator[ADCM, None, None]:
     """Runs adcm container from the previously initialized image.
     Operates '--dontstop' option.
     Returns authorized instance of ADCM object
     """
-    yield from _adcm(image, cmd_opts, request, upgradable=adcm_is_upgradable)
+    yield from _adcm(image, cmd_opts, request, upgradable=adcm_is_upgradable, https=adcm_https)
 
 
 @allure.title("[SS] ADCM Container")
 @pytest.fixture(scope="session")
-def adcm_ss(image, cmd_opts, request, adcm_is_upgradable: bool) -> Generator[ADCM, None, None]:
+def adcm_ss(image, cmd_opts, request, adcm_is_upgradable: bool, adcm_https: bool) -> Generator[ADCM, None, None]:
     """Runs adcm container from the previously initialized image.
     Operates '--dontstop' option.
     Returns authorized instance of ADCM object
     """
-    yield from _adcm(image, cmd_opts, request, upgradable=adcm_is_upgradable)
+    yield from _adcm(image, cmd_opts, request, upgradable=adcm_is_upgradable, https=adcm_https)
 
 
 @allure.title("[SS] ADCM upgradable flag")
 @pytest.fixture(scope="session")
 def adcm_is_upgradable(request) -> bool:
+    """Set flag that controls either ADCM will be upgradable or not"""
+    if hasattr(request, "param") and request.param:
+        return True
+    return False
+
+
+@allure.title("[SS] ADCM https flag")
+@pytest.fixture(scope="session")
+def adcm_https(request) -> bool:
     """Set flag that controls either ADCM will be upgradable or not"""
     if hasattr(request, "param") and request.param:
         return True
