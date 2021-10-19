@@ -18,11 +18,12 @@ import re
 import socket
 import string
 import tarfile
+from tempfile import TemporaryDirectory
 import warnings
 from contextlib import contextmanager, suppress
 from dataclasses import asdict, dataclass
 from gzip import compress
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Generator
 
 import allure
 import docker
@@ -61,7 +62,7 @@ def _port_is_free(ip, port) -> bool:
         return sock.connect_ex((ip, port)) != 0
 
 
-def _find_port(ip, port_from: int = 0) -> int:
+def _yield_ports(ip, port_from: int = 0) -> Generator[int, None, None]:
     gw_count = os.environ.get("PYTEST_XDIST_WORKER_COUNT", 0)
     if int(gw_count) > MAX_WORKER_COUNT:
         pytest.exit("Expected maximum workers count is {MAX_WORKER_COUNT}.")
@@ -72,7 +73,7 @@ def _find_port(ip, port_from: int = 0) -> int:
     range_start = max(port_from, offset)
     for port in range(range_start, range_start + range_length):
         if _port_is_free(ip, port):
-            return port
+            yield port
     raise UnableToBind("There is no free port for the given worker.")
 
 
@@ -145,6 +146,8 @@ class ADCMInitializer:
         "preupload_bundle_urls",
         "adcm_api_credentials",
         "fill_dummy_data",
+        "generate_certs",
+        "_certs_tmpdir",
         "_adcm",
         "_adcm_cli",
     )
@@ -161,6 +164,7 @@ class ADCMInitializer:
         preupload_bundle_urls=None,
         adcm_api_credentials=None,
         fill_dummy_data=False,
+        generate_certs=False,
     ):
         self.repo = repo
         self.tag = tag if tag else random_string()
@@ -171,7 +175,9 @@ class ADCMInitializer:
         self.preupload_bundle_urls = preupload_bundle_urls
         self.adcm_api_credentials = adcm_api_credentials if adcm_api_credentials else {}
         self.fill_dummy_data = fill_dummy_data
-        self._adcm = None
+        self.generate_certs = generate_certs
+        self._certs_tmpdir: Optional[TemporaryDirectory] = None
+        self._adcm: Optional[ADCM] = None
         self._adcm_cli = None
 
     @allure.step("Prepare initialized ADCM image")
@@ -197,6 +203,7 @@ class ADCMInitializer:
         self._preupload_bundles()
         # Fill ADCM with a dummy objects
         self._fill_dummy_data()
+        self._generate_certs()
         # Create a snapshot from initialized container
         self._adcm.stop()
         with allure.step(f"Commit initialized ADCM container to image {self.repo}:{self.tag}"):
@@ -233,6 +240,29 @@ class ADCMInitializer:
     def _init_adcm_cli(self):
         if not self._adcm_cli:
             self._adcm_cli = ADCMClient(url=self._adcm.url, **self.adcm_api_credentials)
+
+    def _generate_certs(self):
+        if self.generate_certs:
+            self._certs_tmpdir = TemporaryDirectory()  # pylint: disable=consider-using-with
+            tmpdir = self._certs_tmpdir.name
+            os.system(
+                f"openssl req -x509 -newkey rsa:4096 -keyout {tmpdir}/key.pem -out {tmpdir}/cert.pem"
+                ' -days 365 -subj "/C=RU/ST=Moscow/L=Moscow/O=Arenadata Software LLC/OU=Release/CN=ADCM"'
+                f' -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:{self._adcm.ip}" -nodes'
+            )
+            file = io.BytesIO()
+            with tarfile.open(mode="w:gz", fileobj=file) as tar:
+                tar.add(tmpdir, "")
+            file.seek(0)
+            self._adcm.container.put_archive("/adcm/data/conf/ssl", file.read())
+
+            os.system(f"cat {tmpdir}/cert.pem {tmpdir}/key.pem > {tmpdir}/bundle.pem")
+            os.environ["REQUESTS_CA_BUNDLE"] = os.path.join(tmpdir, "bundle.pem")
+
+    def cleanup(self):
+        """Cleanup adcm initializer artifacts"""
+        if self.generate_certs:
+            self._certs_tmpdir.cleanup()
 
 
 def image_exists(repo: str, tag: str, dc: Optional[DockerClient] = None):
@@ -286,11 +316,14 @@ class ContainerConfig:
     tag: Optional[str] = None
     pull: bool = True
     remove: bool = True
+    https: bool = False
     labels: Optional[dict] = None
     bind_ip: Optional[str] = None
     bind_port: Optional[int] = None
+    bind_secure_port: Optional[int] = None
     api_ip: Optional[str] = None
     api_port: Optional[int] = None
+    api_secure_port: Optional[int] = None
     volumes: Optional[dict] = None
     name: Optional[str] = None
     docker_url: Optional[str] = None
@@ -347,18 +380,22 @@ class DockerWrapper:  # pylint: disable=too-few-public-methods
                 name="Container config",
                 attachment_type=AttachmentType.JSON,
             )
-            container, config.bind_port = (
+            container, config.bind_port, config.bind_secure_port = (
                 self._run_container(config) if config.bind_port else self._run_container_on_free_port(config)
             )
 
-        config.api_ip, config.api_port = self._get_adcm_ip_and_port(config, container)
+        config.api_ip, config.api_port, config.api_secure_port = self._get_adcm_ip_and_port(config, container)
 
         _wait_for_adcm_container_init(container, config.api_ip, config.api_port)
 
         return container, config
 
-    def _run_container_on_free_port(self, config: ContainerConfig) -> Tuple[Container, int]:
-        config.bind_port = _find_port(config.bind_ip)
+    def _run_container_on_free_port(self, config: ContainerConfig) -> Tuple[Container, int, int]:
+        free_ports = _yield_ports(config.bind_ip)
+        config.bind_port = next(free_ports)
+        if config.https:
+            config.bind_secure_port = next(free_ports)
+
         for _ in range(0, CONTAINER_START_RETRY_COUNT):
             try:
                 return self._run_container(config)
@@ -370,16 +407,21 @@ class DockerWrapper:  # pylint: disable=too-few-public-methods
                     # such error excepting leaves created container and there is
                     # no way to clean it other than from docker library
                     # try to find next one port
-                    config.bind_port = _find_port(config.bind_ip, config.bind_port + 1)
+                    config.bind_port = next(free_ports)
+                    if config.https:
+                        config.bind_secure_port = next(free_ports)
                 else:
                     raise err
         raise RetryCountExceeded(f"Unable to start container after {CONTAINER_START_RETRY_COUNT} retries")
 
-    def _run_container(self, config: ContainerConfig) -> Container:
+    def _run_container(self, config: ContainerConfig) -> (Container, int):
+        ports = {"8000": (config.bind_ip, config.bind_port)}
+        if config.bind_secure_port:
+            ports["8443"] = (config.bind_ip, config.bind_secure_port)
         return (
             self.client.containers.run(
                 config.full_image,
-                ports={"8000": (config.bind_ip, config.bind_port)},
+                ports=ports,
                 volumes=config.volumes,
                 remove=config.remove,
                 labels=config.labels,
@@ -387,17 +429,19 @@ class DockerWrapper:  # pylint: disable=too-few-public-methods
                 detach=True,
             ),
             config.bind_port,
+            config.bind_secure_port,
         )
 
-    def _get_adcm_ip_and_port(self, config: ContainerConfig, container) -> Tuple[str, str]:
+    def _get_adcm_ip_and_port(self, config: ContainerConfig, container) -> Tuple[str, str, str]:
         # If test runner is running in docker then 127.0.0.1
         # will be local container loop interface instead of host loop interface,
         # so we need to establish ADCM API connection using internal docker network
-        api_ip, api_port = config.bind_ip, config.bind_port
+        api_ip, api_port, api_secure_port = config.bind_ip, config.bind_port, config.bind_secure_port
         if config.bind_ip == DEFAULT_IP and is_docker():
             api_ip = self.client.api.inspect_container(container.id)["NetworkSettings"]["IPAddress"]
             api_port = "8000"
-        return api_ip, api_port
+            api_secure_port = "8443"
+        return api_ip, api_port, api_secure_port
 
 
 class ADCM:
@@ -421,7 +465,7 @@ class ADCM:
     @property
     def url(self):
         """ADCM base URL"""
-        return f"http://{self.ip}:{self.port}"
+        return f"{self.protocol}://{self.ip}:{self.port}"
 
     @property
     def ip(self):
@@ -431,7 +475,12 @@ class ADCM:
     @property
     def port(self):
         """ADCM IP address"""
-        return self.container_config.api_port
+        return self.container_config.api_secure_port if self.container_config.https else self.container_config.api_port
+
+    @property
+    def protocol(self):
+        """Http or https"""
+        return "https" if self.container_config.https else "http"
 
     @allure.step("Stop ADCM container")
     def stop(self):

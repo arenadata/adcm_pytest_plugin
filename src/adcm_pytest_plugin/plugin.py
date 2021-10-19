@@ -23,6 +23,7 @@ from docker.utils import parse_repository_tag
 from version_utils import rpm
 
 from .fixtures import *  # noqa: F401, F403
+from .params import *  # noqa: F401, F403
 from .utils import func_name_to_title, allure_reporter
 
 options: Namespace = Namespace()
