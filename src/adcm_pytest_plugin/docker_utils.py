@@ -242,22 +242,23 @@ class ADCMInitializer:
             self._adcm_cli = ADCMClient(url=self._adcm.url, **self.adcm_api_credentials)
 
     def _generate_certs(self):
-        if self.generate_certs:
-            self._certs_tmpdir = TemporaryDirectory()  # pylint: disable=consider-using-with
-            tmpdir = self._certs_tmpdir.name
-            os.system(
-                f"openssl req -x509 -newkey rsa:4096 -keyout {tmpdir}/key.pem -out {tmpdir}/cert.pem"
-                ' -days 365 -subj "/C=RU/ST=Moscow/L=Moscow/O=Arenadata Software LLC/OU=Release/CN=ADCM"'
-                f' -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:{self._adcm.ip}" -nodes'
-            )
-            file = io.BytesIO()
-            with tarfile.open(mode="w:gz", fileobj=file) as tar:
-                tar.add(tmpdir, "")
-            file.seek(0)
-            self._adcm.container.put_archive("/adcm/data/conf/ssl", file.read())
+        if not self.generate_certs:
+            return
+        self._certs_tmpdir = TemporaryDirectory()  # pylint: disable=consider-using-with
+        tmpdir = self._certs_tmpdir.name
+        os.system(
+            f"openssl req -x509 -newkey rsa:4096 -keyout {tmpdir}/key.pem -out {tmpdir}/cert.pem"
+            ' -days 365 -subj "/C=RU/ST=Moscow/L=Moscow/O=Arenadata Software LLC/OU=Release/CN=ADCM"'
+            f' -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:{self._adcm.ip}" -nodes'
+        )
+        file = io.BytesIO()
+        with tarfile.open(mode="w:gz", fileobj=file) as tar:
+            tar.add(tmpdir, "")
+        file.seek(0)
+        self._adcm.container.put_archive("/adcm/data/conf/ssl", file.read())
 
-            os.system(f"cat {tmpdir}/cert.pem {tmpdir}/key.pem > {tmpdir}/bundle.pem")
-            os.environ["REQUESTS_CA_BUNDLE"] = os.path.join(tmpdir, "bundle.pem")
+        os.system(f"cat {tmpdir}/cert.pem {tmpdir}/key.pem > {tmpdir}/bundle.pem")
+        os.environ["REQUESTS_CA_BUNDLE"] = os.path.join(tmpdir, "bundle.pem")
 
     def cleanup(self):
         """Cleanup adcm initializer artifacts"""
