@@ -257,8 +257,9 @@ class ADCMInitializer:
         file.seek(0)
         self._adcm.container.put_archive("/adcm/data/conf/ssl", file.read())
 
-        os.system(f"cat {tmpdir}/cert.pem {tmpdir}/key.pem > {tmpdir}/bundle.pem")
-        os.environ["REQUESTS_CA_BUNDLE"] = os.path.join(tmpdir, "bundle.pem")
+        bundle_path = os.path.join(tmpdir, "bundle.pem")
+        os.system(f"cat {tmpdir}/cert.pem {tmpdir}/key.pem > {bundle_path}")
+        os.environ["REQUESTS_CA_BUNDLE"] = bundle_path
 
     def cleanup(self):
         """Cleanup adcm initializer artifacts"""
