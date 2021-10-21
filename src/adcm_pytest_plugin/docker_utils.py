@@ -249,7 +249,7 @@ class ADCMInitializer:
         os.system(
             f"openssl req -x509 -newkey rsa:4096 -keyout {tmpdir}/key.pem -out {tmpdir}/cert.pem"
             ' -days 365 -subj "/C=RU/ST=Moscow/L=Moscow/O=Arenadata Software LLC/OU=Release/CN=ADCM"'
-            f' -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:{self._adcm.ip}" -nodes'
+            f' -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:{self._adcm.container_config.bind_ip}" -nodes'
         )
         file = io.BytesIO()
         with tarfile.open(mode="w:gz", fileobj=file) as tar:
