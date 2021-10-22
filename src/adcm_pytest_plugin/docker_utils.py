@@ -137,6 +137,7 @@ class ADCMInitializer:
     """
 
     __slots__ = (
+        "container_config",
         "repo",
         "tag",
         "adcm_repo",
@@ -155,6 +156,7 @@ class ADCMInitializer:
     # pylint: disable=too-many-arguments
     def __init__(
         self,
+        container_config: "ContainerConfig" = None,
         repo="local/adcminit",
         tag=None,
         adcm_repo=None,
@@ -166,16 +168,19 @@ class ADCMInitializer:
         fill_dummy_data=False,
         generate_certs=False,
     ):
+        self.container_config = container_config or ContainerConfig(
+            image=adcm_repo, tag=adcm_tag, remove=False, pull=pull, https=generate_certs
+        )
         self.repo = repo
         self.tag = tag if tag else random_string()
-        self.adcm_repo = adcm_repo
-        self.adcm_tag = adcm_tag
-        self.pull = pull
+        self.adcm_repo = container_config.image
+        self.adcm_tag = container_config.tag
+        self.pull = container_config.pull
         self.dc = dc if dc else docker.from_env(timeout=120)
         self.preupload_bundle_urls = preupload_bundle_urls
         self.adcm_api_credentials = adcm_api_credentials if adcm_api_credentials else {}
         self.fill_dummy_data = fill_dummy_data
-        self.generate_certs = generate_certs
+        self.generate_certs = container_config.https
         self._certs_tmpdir: Optional[TemporaryDirectory] = None
         self._adcm: Optional[ADCM] = None
         self._adcm_cli = None
@@ -197,8 +202,7 @@ class ADCMInitializer:
     def init_adcm(self):
         """Init ADCM coinaiter and commit it into image"""
         dw = DockerWrapper(dc=self.dc)
-        config = ContainerConfig(image=self.adcm_repo, tag=self.adcm_tag, remove=False, pull=self.pull)
-        self._adcm = ADCM(docker_wrapper=dw, container_config=config)
+        self._adcm = ADCM(docker_wrapper=dw, container_config=self.container_config)
         # Pre-upload bundles to ADCM before image initialization
         self._preupload_bundles()
         # Fill ADCM with a dummy objects
@@ -242,7 +246,7 @@ class ADCMInitializer:
             self._adcm_cli = ADCMClient(url=self._adcm.url, **self.adcm_api_credentials)
 
     def _generate_certs(self):
-        if not self.generate_certs:
+        if not self.container_config.https:
             return
         self._certs_tmpdir = TemporaryDirectory()  # pylint: disable=consider-using-with
         tmpdir = self._certs_tmpdir.name
@@ -263,7 +267,7 @@ class ADCMInitializer:
 
     def cleanup(self):
         """Cleanup adcm initializer artifacts"""
-        if self.generate_certs:
+        if self.container_config.https:
             self._certs_tmpdir.cleanup()
 
 
@@ -377,18 +381,16 @@ class DockerWrapper:  # pylint: disable=too-few-public-methods
             config.bind_ip = base_url[ip_start:ip_end]
 
         with allure.step(f"Run ADCM container from {config.image}:{config.tag}"):
+            container, config.bind_port, config.bind_secure_port = (
+                self._run_container(config) if config.bind_port else self._run_container_on_free_port(config)
+            )
+            config.api_ip, config.api_port, config.api_secure_port = self._get_adcm_ip_and_port(config, container)
             allure.attach(
                 json.dumps(asdict(config), indent=2),  # config object is not serializable
                 name="Container config",
                 attachment_type=AttachmentType.JSON,
             )
-            container, config.bind_port, config.bind_secure_port = (
-                self._run_container(config) if config.bind_port else self._run_container_on_free_port(config)
-            )
-
-        config.api_ip, config.api_port, config.api_secure_port = self._get_adcm_ip_and_port(config, container)
-
-        _wait_for_adcm_container_init(container, config.api_ip, config.api_port)
+            _wait_for_adcm_container_init(container, config.api_ip, config.api_port)
 
         return container, config
 
