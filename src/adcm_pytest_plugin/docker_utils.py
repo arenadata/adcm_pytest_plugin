@@ -173,14 +173,14 @@ class ADCMInitializer:
         )
         self.repo = repo
         self.tag = tag if tag else random_string()
-        self.adcm_repo = container_config.image
-        self.adcm_tag = container_config.tag
-        self.pull = container_config.pull
+        self.adcm_repo = self.container_config.image
+        self.adcm_tag = self.container_config.tag
+        self.pull = self.container_config.pull
         self.dc = dc if dc else docker.from_env(timeout=120)
         self.preupload_bundle_urls = preupload_bundle_urls
         self.adcm_api_credentials = adcm_api_credentials if adcm_api_credentials else {}
         self.fill_dummy_data = fill_dummy_data
-        self.generate_certs = container_config.https
+        self.generate_certs = self.container_config.https
         self._certs_tmpdir: Optional[TemporaryDirectory] = None
         self._adcm: Optional[ADCM] = None
         self._adcm_cli = None
