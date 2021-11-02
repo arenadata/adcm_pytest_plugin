@@ -1,4 +1,8 @@
 repos:
+  - repo: https://github.com/pycqa/isort
+    rev: 5.9.3
+    hooks:
+      - id: isort
   - repo: https://github.com/psf/black
     rev: '21.5b1'
     hooks:
@@ -19,8 +23,3 @@ repos:
           - retry
           - deprecated
           - coreapi
-  - repo: https://github.com/pycqa/isort
-    rev: 5.9.3
-    hooks:
-      - id: isort
-#        args: ["--profile", "black", "--filter-files"]
