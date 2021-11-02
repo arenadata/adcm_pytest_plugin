@@ -12,9 +12,11 @@
 
 """Main module of plugin with options and hooks"""
 # pylint: disable=wildcard-import,unused-wildcard-import
+import json
 import os
 from argparse import Namespace
 from typing import List, Iterator
+from pathlib import Path
 
 import pytest
 import requests
@@ -40,6 +42,7 @@ def pytest_configure(config: Config):
     """
     global options  # pylint: disable=global-statement,invalid-name,global-variable-not-assigned
     options.__dict__.update(config.option.__dict__)
+    pytest.action_run_storage = []
 
 
 def pytest_addoption(parser):
@@ -112,6 +115,13 @@ def pytest_addoption(parser):
         help="Run actions with 'verbose' checkbox selected. "
         "Applied only to action calls over adcm_client."
         "Does not affect UI action calls in tests",
+    )
+
+    parser.addoption(
+        "--actions-report-dir",
+        action="store",
+        default=None,
+        help="Enable collection of the called actions report to provided dir",
     )
 
 
@@ -234,10 +244,27 @@ def pytest_runtest_makereport(item, call):
     setattr(item, "rep_" + rep.when, rep)
 
 
-def pytest_sessionfinish():
+def pytest_sessionfinish(session):
     """
     Clear custom env variables at the end of all tests
+    Create actions call report
     """
     for var in dict(os.environ):
         if "rep_" in var:
             del os.environ[var]
+
+    if session.config.option.actions_report_dir:
+        actions_report_dir = (
+            os.path.join(os.getcwd(), session.config.option.actions_report_dir)
+            if not session.config.option.actions_report_dir.startswith("/")
+            else session.config.option.actions_report_dir
+        )
+
+        Path(actions_report_dir).mkdir(parents=True, exist_ok=True)
+
+        with open(
+            os.path.join(actions_report_dir, f"{os.environ.get('PYTEST_XDIST_WORKER', 'master')}.json"),
+            "w",
+            encoding="utf-8",
+        ) as file:
+            file.write(json.dumps([obj.to_dict() for obj in pytest.action_run_storage], indent=2))

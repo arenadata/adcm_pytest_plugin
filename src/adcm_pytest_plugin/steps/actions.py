@@ -20,13 +20,15 @@ from typing import Union
 from coreapi.exceptions import ErrorMessage
 
 import allure
+import pytest
 from version_utils import rpm
 from adcm_client.base import ObjectNotFound
 from adcm_client.objects import Cluster, Service, Host, Task, Component, Provider
 
-from .asserts import assert_action_result
-from ..exceptions.adcm import ADCMError
-from ..plugin import options
+from adcm_pytest_plugin.steps.asserts import assert_action_result
+from adcm_pytest_plugin.exceptions.adcm import ADCMError
+from adcm_pytest_plugin.plugin import options
+from adcm_pytest_plugin.objects.actions import ActionRunInfo
 
 
 def _get_error_text_from_task_logs(task: Task):
@@ -312,7 +314,9 @@ def _run_action_and_assert_result(
             kwargs["verbose"] = options.verbose_actions  # pylint: disable=no-member
         obj.reread()
         try:
-            task = obj.action(name=action_name).run(**kwargs)
+            action = obj.action(name=action_name)
+            pytest.action_run_storage.append(ActionRunInfo.from_action(action=action, expected_status=expected_status))
+            task = action.run(**kwargs)
         except ErrorMessage as err:
             ADCMError.raise_if_suitable(err.error.title)
             raise
