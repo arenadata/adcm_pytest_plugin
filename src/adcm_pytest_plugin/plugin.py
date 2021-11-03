@@ -25,6 +25,7 @@ from docker.utils import parse_repository_tag
 from version_utils import rpm
 
 from .fixtures import *  # noqa: F401, F403
+from .objects.actions import ActionRunInfo, ActionsRunReport
 from .params import *  # noqa: F401, F403
 from .utils import func_name_to_title, allure_reporter
 
@@ -244,27 +245,48 @@ def pytest_runtest_makereport(item, call):
     setattr(item, "rep_" + rep.when, rep)
 
 
+def _get_actions_dir(config):
+    return (
+        os.path.join(os.getcwd(), config.option.actions_report_dir)
+        if not config.option.actions_report_dir.startswith("/")
+        else config.option.actions_report_dir
+    )
+
+
 def pytest_sessionfinish(session):
     """
     Clear custom env variables at the end of all tests
-    Create actions call report
+    Create files with raw actions call data
     """
     for var in dict(os.environ):
         if "rep_" in var:
             del os.environ[var]
 
     if session.config.option.actions_report_dir:
-        actions_report_dir = (
-            os.path.join(os.getcwd(), session.config.option.actions_report_dir)
-            if not session.config.option.actions_report_dir.startswith("/")
-            else session.config.option.actions_report_dir
-        )
-
+        actions_report_dir = _get_actions_dir(session.config)
         Path(actions_report_dir).mkdir(parents=True, exist_ok=True)
-
         with open(
-            os.path.join(actions_report_dir, f"{os.environ.get('PYTEST_XDIST_WORKER', 'master')}.json"),
+            os.path.join(actions_report_dir, f"{os.getenv('PYTEST_XDIST_WORKER', 'master')}.json"),
             "w",
             encoding="utf-8",
         ) as file:
             file.write(json.dumps([obj.to_dict() for obj in pytest.action_run_storage], indent=2))
+
+
+def pytest_unconfigure(config: Config):
+    """Create actions call report"""
+    if not os.getenv("PYTEST_XDIST_WORKER") and config.option.actions_report_dir:
+        summary_file = "summary.json"
+        common_actions_call_list = []
+        actions_report_dir = _get_actions_dir(config)
+        for filename in os.listdir(actions_report_dir):
+            if filename != summary_file:
+                with open(os.path.join(actions_report_dir, filename), "r", encoding="utf-8") as file:
+                    common_actions_call_list.extend([ActionRunInfo.from_dict(obj) for obj in json.loads(file.read())])
+            os.remove(os.path.join(actions_report_dir, filename))
+        with open(
+            os.path.join(actions_report_dir, summary_file),
+            "w",
+            encoding="utf-8",
+        ) as file:
+            file.write(ActionsRunReport(common_actions_call_list).make_summary())
