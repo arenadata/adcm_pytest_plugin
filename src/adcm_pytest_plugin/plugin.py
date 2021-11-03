@@ -14,6 +14,7 @@
 # pylint: disable=wildcard-import,unused-wildcard-import
 import json
 import os
+import shutil
 from argparse import Namespace
 from typing import List, Iterator
 from pathlib import Path
@@ -44,6 +45,11 @@ def pytest_configure(config: Config):
     global options  # pylint: disable=global-statement,invalid-name,global-variable-not-assigned
     options.__dict__.update(config.option.__dict__)
     pytest.action_run_storage = []
+    if config.option.actions_report_dir:
+        try:
+            shutil.rmtree(_get_actions_dir(config))
+        except FileNotFoundError:
+            pass
 
 
 def pytest_addoption(parser):
@@ -280,9 +286,8 @@ def pytest_unconfigure(config: Config):
         common_actions_call_list = []
         actions_report_dir = _get_actions_dir(config)
         for filename in os.listdir(actions_report_dir):
-            if filename != summary_file:
-                with open(os.path.join(actions_report_dir, filename), "r", encoding="utf-8") as file:
-                    common_actions_call_list.extend([ActionRunInfo.from_dict(obj) for obj in json.loads(file.read())])
+            with open(os.path.join(actions_report_dir, filename), "r", encoding="utf-8") as file:
+                common_actions_call_list.extend([ActionRunInfo.from_dict(obj) for obj in json.loads(file.read())])
             os.remove(os.path.join(actions_report_dir, filename))
         with open(
             os.path.join(actions_report_dir, summary_file),
