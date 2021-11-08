@@ -28,7 +28,7 @@ from adcm_client.objects import Cluster, Service, Host, Task, Component, Provide
 from adcm_pytest_plugin.steps.asserts import assert_action_result
 from adcm_pytest_plugin.exceptions.adcm import ADCMError
 from adcm_pytest_plugin.plugin import options
-from adcm_pytest_plugin.objects.actions import ActionRunInfo
+from adcm_pytest_plugin.objects.actions import ActionRunInfo, ActionsSpec
 
 
 def _get_error_text_from_task_logs(task: Task):
@@ -315,7 +315,12 @@ def _run_action_and_assert_result(
         obj.reread()
         try:
             action = obj.action(name=action_name)
-            pytest.action_run_storage.append(ActionRunInfo.from_action(action=action, expected_status=expected_status))
+            if getattr(options, "actions_report_dir", None):
+                pytest.action_run_storage.append(
+                    ActionRunInfo.from_action(action=action, expected_status=expected_status)
+                )
+                actions_spec = ActionsSpec.from_action(action=action)
+                pytest.actions_spec_storage[actions_spec.uniq_id] = actions_spec
             task = action.run(**kwargs)
         except ErrorMessage as err:
             ADCMError.raise_if_suitable(err.error.title)
