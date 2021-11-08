@@ -26,7 +26,7 @@ class ActionRunInfo:
     action_name: str
     parent_name: str
     parent_type: str
-    bundle_name: str
+    bundle_info: str
     expected_status: str
     called_from: str
 
@@ -50,7 +50,7 @@ class ActionRunInfo:
             expected_status=expected_status,
             parent_name=proto.name,
             parent_type=proto.type,
-            bundle_name=bundle.name,
+            bundle_info=f"{bundle.name}_{bundle.version}_{bundle.edition}",
             called_from=os.getenv("PYTEST_CURRENT_TEST", "Undefined"),
         )
 
@@ -80,14 +80,14 @@ class ActionsRunReport:
 
         report = nested_dict()
         for action in self.actions:
-            action_report = report[action.bundle_name][action.parent_type][action.parent_name][action.action_name]
+            action_report = report[action.bundle_info][action.parent_type][action.parent_name][action.action_name]
             if action_report == {}:
-                report[action.bundle_name][action.parent_type][action.parent_name][action.action_name] = {
+                report[action.bundle_info][action.parent_type][action.parent_name][action.action_name] = {
                     "call_count": 0,
                     "expected_statuses": set(),
                     "called_from": set(),
                 }
-                action_report = report[action.bundle_name][action.parent_type][action.parent_name][action.action_name]
+                action_report = report[action.bundle_info][action.parent_type][action.parent_name][action.action_name]
             action_report["call_count"] += 1
             action_report["expected_statuses"].add(action.expected_status)
             action_report["called_from"].add(action.called_from)
