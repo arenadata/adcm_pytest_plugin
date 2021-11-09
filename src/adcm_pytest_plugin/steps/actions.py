@@ -23,7 +23,7 @@ import allure
 import pytest
 from version_utils import rpm
 from adcm_client.base import ObjectNotFound
-from adcm_client.objects import Cluster, Service, Host, Task, Component, Provider
+from adcm_client.objects import Cluster, Service, Host, Task, Component, Provider, Action
 
 from adcm_pytest_plugin.steps.asserts import assert_action_result
 from adcm_pytest_plugin.exceptions.adcm import ADCMError
@@ -315,18 +315,20 @@ def _run_action_and_assert_result(
         obj.reread()
         try:
             action = obj.action(name=action_name)
-            if getattr(options, "actions_report_dir", None):
-                pytest.action_run_storage.append(
-                    ActionRunInfo.from_action(action=action, expected_status=expected_status)
-                )
-                actions_spec = ActionsSpec.from_action(action=action)
-                pytest.actions_spec_storage[actions_spec.uniq_id] = actions_spec
+            _add_actions_info(action=action, expected_status=expected_status)
             task = action.run(**kwargs)
         except ErrorMessage as err:
             ADCMError.raise_if_suitable(err.error.title)
             raise
         wait_for_task_and_assert_result(task=task, action_name=action_name, status=expected_status, timeout=timeout)
         return task
+
+
+def _add_actions_info(action: Action, expected_status: str):
+    if getattr(options, "actions_report_dir", None):
+        pytest.action_run_storage.append(ActionRunInfo.from_action(action=action, expected_status=expected_status))
+        actions_spec = ActionsSpec.from_action(action=action)
+        pytest.actions_spec_storage[actions_spec.uniq_id] = actions_spec
 
 
 def run_cluster_action_and_assert_result(cluster: Cluster, action: str, status="success", **kwargs):

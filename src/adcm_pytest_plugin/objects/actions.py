@@ -12,7 +12,7 @@
 """Class definitions for actions related objects"""
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict, fields
 from typing import List
 from collections import defaultdict
 
@@ -32,12 +32,12 @@ class ActionRunInfo:
 
     def to_dict(self):
         """Convert object to dict"""
-        return self.__dict__
+        return asdict(self)
 
     @classmethod
     def from_dict(cls, source_dict: dict):
         """Recreate instance from json string"""
-        return cls(**{key: source_dict[key] for key in cls.__dict__["__annotations__"].keys()})
+        return cls(**{key.name: source_dict[key.name] for key in fields(cls)})
 
     # pylint: disable=protected-access
     @classmethod
@@ -57,7 +57,8 @@ class ActionRunInfo:
 
 @dataclass
 class ActionsSpec:
-    """Info about actions from prototype"""
+    """Info about all actions from prototype
+    Is used to compare actually called actions with the full actions list"""
 
     actions: List[str]
     parent_name: str
@@ -66,7 +67,7 @@ class ActionsSpec:
 
     def to_dict(self):
         """Convert object to dict"""
-        return self.__dict__
+        return asdict(self)
 
     @property
     def uniq_id(self):
@@ -76,7 +77,7 @@ class ActionsSpec:
     @classmethod
     def from_dict(cls, source_dict: dict):
         """Recreate instance from json string"""
-        return cls(**{key: source_dict[key] for key in cls.__dict__["__annotations__"].keys()})
+        return cls(**{key.name: source_dict[key.name] for key in fields(cls)})
 
     # pylint: disable=protected-access
     @classmethod
@@ -115,7 +116,14 @@ class ActionsRunReport:
         """Make summary report in form of JSON string"""
 
         def nested_dict():
-            """Nested dict helper"""
+            """
+            Recursive defaultdict declaration.
+            Resulting object will be defaultdict with arbitrary depth
+            Ex.
+            demo = nested_dict()
+            demo["new_key_level_1"]["new_key_level_2"]["new_key_level_3"] = "value"
+            demo["newer_key_level_1"]["newer_key_level_2"] = "yet another value"
+            """
             return defaultdict(nested_dict)
 
         report = nested_dict()

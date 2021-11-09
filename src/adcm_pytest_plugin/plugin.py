@@ -14,6 +14,7 @@
 # pylint: disable=wildcard-import,unused-wildcard-import
 import json
 import os
+import pathlib
 import shutil
 from argparse import Namespace
 from typing import List, Iterator
@@ -47,10 +48,11 @@ def pytest_configure(config: Config):
     if config.option.actions_report_dir:
         pytest.action_run_storage = []
         pytest.actions_spec_storage = {}
-        try:
-            shutil.rmtree(_get_actions_dir(config))
-        except FileNotFoundError:
-            pass
+        if not os.getenv("PYTEST_XDIST_WORKER"):
+            try:
+                shutil.rmtree(_get_actions_dir(config))
+            except FileNotFoundError:
+                pass
 
 
 def pytest_addoption(parser):
@@ -128,6 +130,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--actions-report-dir",
         action="store",
+        type=pathlib.Path,
         default=None,
         help="Enable collection of the called actions report to provided dir",
     )
@@ -253,11 +256,7 @@ def pytest_runtest_makereport(item, call):
 
 
 def _get_actions_dir(config):
-    return (
-        os.path.join(os.getcwd(), config.option.actions_report_dir)
-        if not config.option.actions_report_dir.startswith("/")
-        else config.option.actions_report_dir
-    )
+    return config.option.actions_report_dir
 
 
 def pytest_sessionfinish(session):
@@ -298,14 +297,14 @@ def pytest_unconfigure(config: Config):
         common_actions_spec = {}
         actions_report_dir = _get_actions_dir(config)
         for filename in os.listdir(actions_report_dir):
+            with open(os.path.join(actions_report_dir, filename), "r", encoding="utf-8") as file:
+                content = file.read()
             if "run" in filename:
-                with open(os.path.join(actions_report_dir, filename), "r", encoding="utf-8") as file:
-                    common_actions_call_list.extend([ActionRunInfo.from_dict(obj) for obj in json.loads(file.read())])
+                common_actions_call_list.extend([ActionRunInfo.from_dict(obj) for obj in json.loads(content)])
             if "spec" in filename:
-                with open(os.path.join(actions_report_dir, filename), "r", encoding="utf-8") as file:
-                    for uniq_id, actions_spec_dict in json.loads(file.read()).items():
-                        actions_spec = ActionsSpec.from_dict(actions_spec_dict)
-                        common_actions_spec[uniq_id] = actions_spec
+                for uniq_id, actions_spec_dict in json.loads(content).items():
+                    actions_spec = ActionsSpec.from_dict(actions_spec_dict)
+                    common_actions_spec[uniq_id] = actions_spec
             os.remove(os.path.join(actions_report_dir, filename))
         with open(
             os.path.join(actions_report_dir, summary_file),
