@@ -18,7 +18,6 @@ import pathlib
 import shutil
 from argparse import Namespace
 from typing import List, Iterator
-from pathlib import Path
 
 import pytest
 import requests
@@ -270,7 +269,7 @@ def pytest_sessionfinish(session):
 
     if session.config.option.actions_report_dir:
         actions_report_dir = _get_actions_dir(session.config)
-        Path(actions_report_dir).mkdir(parents=True, exist_ok=True)
+        actions_report_dir.mkdir(parents=True, exist_ok=True)
         with open(
             os.path.join(actions_report_dir, f"{os.getenv('PYTEST_XDIST_WORKER', 'master')}_run.json"),
             "w",
