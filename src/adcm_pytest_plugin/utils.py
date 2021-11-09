@@ -19,7 +19,7 @@ import string
 from contextlib import AbstractContextManager
 from inspect import getfullargspec
 from time import sleep, time
-from typing import Callable, Iterable, List, Tuple, Type, Union, Optional
+from typing import Callable, Iterable, List, Optional, Tuple, Type, Union
 
 import allure
 import pytest

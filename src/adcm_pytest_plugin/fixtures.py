@@ -27,6 +27,7 @@ from docker.utils import parse_repository_tag
 from requests.exceptions import ReadTimeout as DockerReadTimeout
 
 from adcm_pytest_plugin import utils
+
 from .docker_utils import (
     ADCM,
     ADCMInitializer,
@@ -37,7 +38,7 @@ from .docker_utils import (
     remove_container_volumes,
     remove_docker_image,
 )
-from .utils import check_mutually_exclusive, allure_reporter
+from .utils import allure_reporter, check_mutually_exclusive
 
 DATADIR = utils.get_data_dir(__file__)
 
