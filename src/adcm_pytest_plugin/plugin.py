@@ -12,7 +12,10 @@
 
 """Main module of plugin with options and hooks"""
 # pylint: disable=wildcard-import,unused-wildcard-import
+import json
 import os
+import pathlib
+import shutil
 from argparse import Namespace
 from typing import Iterator, List
 
@@ -23,6 +26,7 @@ from docker.utils import parse_repository_tag
 from version_utils import rpm
 
 from .fixtures import *  # noqa: F401, F403
+from .objects.actions import ActionRunInfo, ActionsRunReport, ActionsSpec
 from .params import *  # noqa: F401, F403
 from .utils import allure_reporter, func_name_to_title
 
@@ -40,6 +44,14 @@ def pytest_configure(config: Config):
     """
     global options  # pylint: disable=global-statement,invalid-name,global-variable-not-assigned
     options.__dict__.update(config.option.__dict__)
+    if config.option.actions_report_dir:
+        pytest.action_run_storage = []
+        pytest.actions_spec_storage = {}
+        if not os.getenv("PYTEST_XDIST_WORKER"):
+            try:
+                shutil.rmtree(_get_actions_dir(config))
+            except FileNotFoundError:
+                pass
 
 
 def pytest_addoption(parser):
@@ -112,6 +124,14 @@ def pytest_addoption(parser):
         help="Run actions with 'verbose' checkbox selected. "
         "Applied only to action calls over adcm_client."
         "Does not affect UI action calls in tests",
+    )
+
+    parser.addoption(
+        "--actions-report-dir",
+        action="store",
+        type=pathlib.Path,
+        default=None,
+        help="Enable collection of the called actions report to provided dir",
     )
 
 
@@ -234,10 +254,64 @@ def pytest_runtest_makereport(item, call):
     setattr(item, "rep_" + rep.when, rep)
 
 
-def pytest_sessionfinish():
+def _get_actions_dir(config):
+    return config.option.actions_report_dir
+
+
+def pytest_sessionfinish(session):
     """
     Clear custom env variables at the end of all tests
+    Create files with raw actions call data
     """
     for var in dict(os.environ):
         if "rep_" in var:
             del os.environ[var]
+
+    if session.config.option.actions_report_dir:
+        actions_report_dir = _get_actions_dir(session.config)
+        actions_report_dir.mkdir(parents=True, exist_ok=True)
+        with open(
+            os.path.join(actions_report_dir, f"{os.getenv('PYTEST_XDIST_WORKER', 'master')}_run.json"),
+            "w",
+            encoding="utf-8",
+        ) as file:
+            file.write(json.dumps([obj.to_dict() for obj in pytest.action_run_storage], indent=2))
+        del pytest.action_run_storage
+        with open(
+            os.path.join(actions_report_dir, f"{os.getenv('PYTEST_XDIST_WORKER', 'master')}_spec.json"),
+            "w",
+            encoding="utf-8",
+        ) as file:
+            file.write(
+                json.dumps({key: value.to_dict() for key, value in pytest.actions_spec_storage.items()}, indent=2)
+            )
+        del pytest.actions_spec_storage
+
+
+def pytest_unconfigure(config: Config):
+    """Create actions call report"""
+    if not os.getenv("PYTEST_XDIST_WORKER") and config.option.actions_report_dir:
+        summary_file = "summary.json"
+        common_actions_call_list = []
+        common_actions_spec = {}
+        actions_report_dir = _get_actions_dir(config)
+        for filename in os.listdir(actions_report_dir):
+            with open(os.path.join(actions_report_dir, filename), "r", encoding="utf-8") as file:
+                content = file.read()
+            if "run" in filename:
+                common_actions_call_list.extend([ActionRunInfo.from_dict(obj) for obj in json.loads(content)])
+            if "spec" in filename:
+                for uniq_id, actions_spec_dict in json.loads(content).items():
+                    actions_spec = ActionsSpec.from_dict(actions_spec_dict)
+                    common_actions_spec[uniq_id] = actions_spec
+            os.remove(os.path.join(actions_report_dir, filename))
+        with open(
+            os.path.join(actions_report_dir, summary_file),
+            "w",
+            encoding="utf-8",
+        ) as file:
+            file.write(
+                ActionsRunReport(
+                    actions=common_actions_call_list, actions_specs=common_actions_spec.values()
+                ).make_summary()
+            )

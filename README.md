@@ -176,6 +176,7 @@ List of available options:
     - [`--remote-executor-host`](#--remote-executor-host)
     - [`--remote-docker`](#--remote-docker)
     - [`--verbose-actions`](#--verbose-actions)
+    - [`--actions-report-dir`](#--actions-report-dir)
 
 ---
 
@@ -284,6 +285,18 @@ Property | Value
 value | `none`
 default | `false`
 
+
+#### `--actions-report-dir`
+
+> If passed then plugin will collect information about all actions calls made with run_action_*** wrappers
+> and create summary report in the provided directory
+
+
+Property | Value
+---: | ---
+value | `string with absolute or elative path to dir where actions report will be stored`
+default | `none`
+example | `--actions-report-dir relative/path/to/dir` or `--actions-report-dir /absolute/path/to/dir`
 
 ## Writing tests for plugin
 
