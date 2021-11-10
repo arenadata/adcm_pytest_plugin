@@ -17,7 +17,7 @@ import os
 import pathlib
 import shutil
 from argparse import Namespace
-from typing import List, Iterator
+from typing import Iterator, List
 
 import pytest
 import requests
@@ -28,7 +28,7 @@ from version_utils import rpm
 from .fixtures import *  # noqa: F401, F403
 from .objects.actions import ActionRunInfo, ActionsRunReport, ActionsSpec
 from .params import *  # noqa: F401, F403
-from .utils import func_name_to_title, allure_reporter
+from .utils import allure_reporter, func_name_to_title
 
 options: Namespace = Namespace()
 _PHASE_RESULT_VAR_NAME_TEMPLATE = "rep_{phase}_passed"

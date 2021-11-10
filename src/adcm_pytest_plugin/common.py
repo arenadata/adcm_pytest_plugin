@@ -11,8 +11,9 @@
 # limitations under the License.
 """Common methods and classes"""
 
-import pytest
 import allure
+import pytest
+
 from .utils import get_data_dir
 
 

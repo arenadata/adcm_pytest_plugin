@@ -17,18 +17,18 @@ import re
 from contextlib import contextmanager
 from difflib import get_close_matches
 from typing import Union
-from coreapi.exceptions import ErrorMessage
 
 import allure
 import pytest
-from version_utils import rpm
 from adcm_client.base import ObjectNotFound
-from adcm_client.objects import Cluster, Service, Host, Task, Component, Provider, Action
+from adcm_client.objects import Action, Cluster, Component, Host, Provider, Service, Task
+from coreapi.exceptions import ErrorMessage
+from version_utils import rpm
 
-from adcm_pytest_plugin.steps.asserts import assert_action_result
 from adcm_pytest_plugin.exceptions.adcm import ADCMError
-from adcm_pytest_plugin.plugin import options
 from adcm_pytest_plugin.objects.actions import ActionRunInfo, ActionsSpec
+from adcm_pytest_plugin.plugin import options
+from adcm_pytest_plugin.steps.asserts import assert_action_result
 
 
 def _get_error_text_from_task_logs(task: Task):

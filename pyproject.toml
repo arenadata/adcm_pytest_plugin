@@ -34,3 +34,7 @@ max-module-lines = 1000
 [tool.pylint.similarities]
 ignore-imports = true
 min-similarity-lines = 5
+
+[tool.isort]
+profile = "black"
+line_length = 120

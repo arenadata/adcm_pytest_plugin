@@ -15,7 +15,6 @@ Common test asserts
 """
 
 import allure
-
 from adcm_client.objects import BaseAPIObject
 
 from adcm_pytest_plugin.exceptions.bundles import BundleError

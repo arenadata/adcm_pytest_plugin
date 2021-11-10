@@ -1,4 +1,8 @@
 repos:
+  - repo: https://github.com/pycqa/isort
+    rev: 5.9.3
+    hooks:
+      - id: isort
   - repo: https://github.com/psf/black
     rev: '21.5b1'
     hooks:
@@ -7,15 +11,15 @@ repos:
   - repo: https://github.com/pre-commit/mirrors-pylint
     rev: 'v3.0.0a3'
     hooks:
-    - id: pylint
-      additional_dependencies:
-        - pytest
-        - docker
-        - adcm_client>=2021.4.15.17
-        - allure-pytest>=2.9.42
-        - requests
-        - version_utils
-        - ifaddr
-        - retry
-        - deprecated
-        - coreapi
+      - id: pylint
+        additional_dependencies:
+          - pytest
+          - docker
+          - adcm_client>=2021.4.15.17
+          - allure-pytest>=2.9.42
+          - requests
+          - version_utils
+          - ifaddr
+          - retry
+          - deprecated
+          - coreapi

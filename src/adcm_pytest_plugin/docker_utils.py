@@ -18,12 +18,12 @@ import re
 import socket
 import string
 import tarfile
-from tempfile import TemporaryDirectory
 import warnings
 from contextlib import contextmanager, suppress
 from dataclasses import asdict, dataclass
 from gzip import compress
-from typing import Optional, Tuple, Generator
+from tempfile import TemporaryDirectory
+from typing import Generator, Optional, Tuple
 
 import allure
 import docker
@@ -39,8 +39,8 @@ from docker.models.containers import Container
 from docker.utils import parse_repository_tag
 from retry.api import retry_call
 
-from .utils import random_string
 from .common import add_dummy_objects_to_adcm
+from .utils import random_string
 
 MIN_DOCKER_PORT = 8000
 MAX_DOCKER_PORT = 9000

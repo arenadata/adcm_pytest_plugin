@@ -12,11 +12,11 @@
 """Class definitions for actions related objects"""
 import json
 import os
-from dataclasses import dataclass, asdict, fields
-from typing import List
 from collections import defaultdict
+from dataclasses import asdict, dataclass, fields
+from typing import List
 
-from adcm_client.objects import Action, Prototype, Bundle
+from adcm_client.objects import Action, Bundle, Prototype
 
 
 @dataclass
