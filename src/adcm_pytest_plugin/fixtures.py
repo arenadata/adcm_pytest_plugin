@@ -49,6 +49,7 @@ __all__ = [
     "adcm_fs",
     "adcm_ss",
     "adcm_ms",
+    "extra_adcm_fs",
     "adcm_is_upgradable",
     "adcm_https",
     "sdk_client_ms",
@@ -340,6 +341,18 @@ def adcm_ss(
     yield from _adcm(
         image, request, upgradable=adcm_is_upgradable, https=adcm_https, bind_container_ip=bind_container_ip
     )
+
+
+@allure.title("[FS] Additional ADCM Container")
+@pytest.fixture()
+def extra_adcm_fs(image, request, adcm_is_upgradable: bool, adcm_https: bool) -> Generator[ADCM, None, None]:
+    """
+    Runs additional ADCM container from the previously initialized image.
+    Operates '--dontstop' option.
+    ! Don't expect it to work with remote-docker and remote-executor-host
+    Returns authorized instance of ADCM object
+    """
+    yield from _adcm(image, request, upgradable=adcm_is_upgradable, https=adcm_https, bind_container_ip=None)
 
 
 @allure.title("[SS] ADCM upgradable flag")
