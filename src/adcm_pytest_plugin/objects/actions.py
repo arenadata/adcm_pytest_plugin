@@ -51,7 +51,7 @@ class ActionRunInfo:
             expected_status=expected_status,
             parent_name=proto.name,
             parent_type=proto.type,
-            bundle_info=f"{bundle.name}_{bundle.version}_{bundle.edition}",
+            bundle_info=f"{bundle.name}_{bundle.version.split('-')[0]}_{bundle.edition}",
             called_from=os.getenv("PYTEST_CURRENT_TEST", "Undefined"),
         )
 
