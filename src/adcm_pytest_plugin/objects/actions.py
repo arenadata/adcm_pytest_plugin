@@ -19,6 +19,10 @@ from typing import List
 from adcm_client.objects import Action, Bundle, Prototype
 
 
+def _get_bundle_id(bundle: Bundle):
+    return f"{bundle.name}_{bundle.version.split('-')[0]}_{bundle.edition}"
+
+
 @dataclass
 class ActionRunInfo:
     """Instance of a single action.run() invocation"""
@@ -50,7 +54,7 @@ class ActionRunInfo:
             expected_status=expected_status,
             parent_name=proto.name,
             parent_type=proto.type,
-            bundle_info=f"{bundle.name}_{bundle.version.split('-')[0]}_{bundle.edition}",
+            bundle_info=_get_bundle_id(bundle),
             called_from=os.getenv("PYTEST_CURRENT_TEST", "Undefined"),
         )
 
@@ -91,7 +95,7 @@ class ActionsSpec:
             actions=actions,
             parent_name=proto.name,
             parent_type=proto.type,
-            bundle_info=f"{bundle.name}_{bundle.version}_{bundle.edition}",
+            bundle_info=_get_bundle_id(bundle),
         )
 
 
