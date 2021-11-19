@@ -12,6 +12,7 @@
 """Class definitions for actions related objects"""
 import json
 import os
+import warnings
 from collections import defaultdict
 from dataclasses import asdict, dataclass, fields
 from typing import List
@@ -136,6 +137,13 @@ class ActionsRunReport:
                 }
         for action in self.actions:
             action_report = report[action.bundle_info][action.parent_type][action.parent_name][action.action_name]
+            if isinstance(action_report, defaultdict):
+                warnings.warn(f"Action {action.action_name} was missing in actions spec")
+                action_report = {
+                    "call_count": 0,
+                    "expected_statuses": set(),
+                    "called_from": set(),
+                }
             action_report["call_count"] += 1
             action_report["expected_statuses"].add(action.expected_status)
             action_report["called_from"].add(action.called_from)
