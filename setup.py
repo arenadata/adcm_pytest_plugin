@@ -11,7 +11,7 @@
 # limitations under the License.
 """Setup plugin"""
 
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 setup(
     name="adcm_pytest_plugin",
@@ -19,7 +19,7 @@ setup(
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     include_package_data=True,
-    version="4.11.1",
+    version="4.11.2",
     # the following makes a plugin available to pytest
     entry_points={"pytest11": ["adcm_pytest_plugin = adcm_pytest_plugin.plugin"]},
     # custom PyPI classifier for pytest plugins
