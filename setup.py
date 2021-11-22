@@ -26,7 +26,7 @@ setup(
     install_requires=[
         "pytest",
         "docker==5.0.0",
-        "adcm_client>=2021.4.15.17",
+        "adcm_client>=2021.11.22.12",
         "allure-pytest>=2.9.42",
         "requests",
         "version_utils",

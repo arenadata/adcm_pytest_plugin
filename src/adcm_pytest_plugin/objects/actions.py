@@ -24,6 +24,10 @@ def _get_bundle_id(bundle: Bundle):
     return f"{bundle.name}_{bundle.version.split('-')[0]}_{bundle.edition}"
 
 
+def _make_parent_name(prototype: Prototype):
+    return f"{prototype.name}_{prototype.display_name}"
+
+
 @dataclass
 class ActionRunInfo:
     """Instance of a single action.run() invocation"""
@@ -53,7 +57,7 @@ class ActionRunInfo:
         return cls(
             action_name=action.name,
             expected_status=expected_status,
-            parent_name=proto.name,
+            parent_name=_make_parent_name(proto),
             parent_type=proto.type,
             bundle_info=_get_bundle_id(bundle),
             called_from=os.getenv("PYTEST_CURRENT_TEST", "Undefined"),
@@ -94,7 +98,7 @@ class ActionsSpec:
 
         return cls(
             actions=actions,
-            parent_name=proto.name,
+            parent_name=_make_parent_name(proto),
             parent_type=proto.type,
             bundle_info=_get_bundle_id(bundle),
         )
