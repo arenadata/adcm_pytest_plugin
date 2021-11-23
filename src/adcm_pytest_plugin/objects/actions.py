@@ -12,6 +12,7 @@
 """Class definitions for actions related objects"""
 import json
 import os
+import warnings
 from collections import defaultdict
 from dataclasses import asdict, dataclass, fields
 from typing import List
@@ -21,6 +22,10 @@ from adcm_client.objects import Action, Bundle, Prototype
 
 def _get_bundle_id(bundle: Bundle):
     return f"{bundle.name}_{bundle.version.split('-')[0]}_{bundle.edition}"
+
+
+def _make_parent_name(prototype: Prototype):
+    return f"{prototype.name}.{prototype.display_name}"
 
 
 @dataclass
@@ -52,7 +57,7 @@ class ActionRunInfo:
         return cls(
             action_name=action.name,
             expected_status=expected_status,
-            parent_name=proto.name,
+            parent_name=_make_parent_name(proto),
             parent_type=proto.type,
             bundle_info=_get_bundle_id(bundle),
             called_from=os.getenv("PYTEST_CURRENT_TEST", "Undefined"),
@@ -93,7 +98,7 @@ class ActionsSpec:
 
         return cls(
             actions=actions,
-            parent_name=proto.name,
+            parent_name=_make_parent_name(proto),
             parent_type=proto.type,
             bundle_info=_get_bundle_id(bundle),
         )
@@ -140,6 +145,15 @@ class ActionsRunReport:
                 }
         for action in self.actions:
             action_report = report[action.bundle_info][action.parent_type][action.parent_name][action.action_name]
+            if isinstance(action_report, defaultdict):
+                warnings.warn(
+                    f"No spec found for action {action.action_name} on {action.parent_type} {action.action_name}"
+                )
+                action_report = {
+                    "call_count": 0,
+                    "expected_statuses": set(),
+                    "called_from": set(),
+                }
             action_report["call_count"] += 1
             action_report["expected_statuses"].add(action.expected_status)
             action_report["called_from"].add(action.called_from)
