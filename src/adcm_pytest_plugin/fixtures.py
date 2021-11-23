@@ -345,13 +345,17 @@ def adcm_ss(
 
 @allure.title("[FS] Additional ADCM Container")
 @pytest.fixture()
-def extra_adcm_fs(image, request, adcm_is_upgradable: bool, adcm_https: bool) -> Generator[ADCM, None, None]:
+def extra_adcm_fs(
+    image, request, adcm_is_upgradable: bool, adcm_https: bool, bind_container_ip
+) -> Generator[ADCM, None, None]:
     """
     Runs additional ADCM container from the previously initialized image.
     Operates '--dontstop' option.
     Returns authorized instance of ADCM object
     """
-    yield from _adcm(image, request, upgradable=adcm_is_upgradable, https=adcm_https, bind_container_ip=None)
+    yield from _adcm(
+        image, request, upgradable=adcm_is_upgradable, https=adcm_https, bind_container_ip=bind_container_ip
+    )
 
 
 @allure.title("[SS] ADCM upgradable flag")
