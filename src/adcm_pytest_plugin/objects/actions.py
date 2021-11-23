@@ -25,7 +25,7 @@ def _get_bundle_id(bundle: Bundle):
 
 
 def _make_parent_name(prototype: Prototype):
-    return f"{prototype.name}_{prototype.display_name}"
+    return f"{prototype.name}.{prototype.display_name}"
 
 
 @dataclass
