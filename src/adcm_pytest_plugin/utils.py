@@ -383,7 +383,7 @@ def wait_until_step_succeeds(func, timeout: Union[int, float] = 300, period: Uni
         last_error = None
         while time() - start < timeout:
             try:
-                func(**kwargs)
+                return func(**kwargs)
             except AssertionError as err:
                 last_error = err
                 sleep(period)
