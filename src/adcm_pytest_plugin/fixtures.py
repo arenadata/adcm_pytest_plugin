@@ -21,6 +21,7 @@ import docker
 import ifaddr
 import pytest
 from _pytest.fixtures import SubRequest
+from _pytest.terminal import TerminalReporter
 from adcm_client.objects import ADCMClient
 from allure_commons.utils import uuid4
 from docker.utils import parse_repository_tag
@@ -204,7 +205,7 @@ def _adcm(image, request, bind_container_ip, upgradable=False, https=False) -> G
     )
 
     if request.config.option.dontstop:
-        _print_adcm_url(adcm)
+        _print_adcm_url(request.config.pluginmanager.get_plugin("terminalreporter"), adcm)
 
     yield adcm
 
@@ -272,15 +273,11 @@ def _attach_adcm_url(request: SubRequest, adcm: ADCM):
         )
 
 
-def _print_adcm_url(adcm: ADCM):
+def _print_adcm_url(reporter: TerminalReporter, adcm: ADCM):
     """Print ADCM URL link to the console output"""
-    print(
-        f"""
-        ###################################
-        ADCM URL - {adcm.url}
-        ###################################
-        """
-    )
+    reporter.write_line("###################################")
+    reporter.write_line(f"ADCM URL - {adcm.url}")
+    reporter.write_line("###################################")
 
 
 def _get_connection_ip(remote_host: str):
