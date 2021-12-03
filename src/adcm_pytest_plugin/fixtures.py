@@ -203,6 +203,9 @@ def _adcm(image, request, bind_container_ip, upgradable=False, https=False) -> G
         ),
     )
 
+    if request.config.option.dontstop:
+        _print_adcm_url(adcm)
+
     yield adcm
 
     if request.config.option.dontstop:
@@ -269,11 +272,22 @@ def _attach_adcm_url(request: SubRequest, adcm: ADCM):
         )
 
 
+def _print_adcm_url(adcm: ADCM):
+    """Print ADCM URL link to the console output"""
+    print(
+        f"""
+        ###################################
+        ADCM URL - {adcm.url}
+        ###################################
+        """
+    )
+
+
 def _get_connection_ip(remote_host: str):
     """
     Try to open connection to remote and get ip address of the interface used.
     """
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # pylint: disable=no-member  # false positive pylint
     sock.connect((remote_host, 1))
     ip = sock.getsockname()[0]
     sock.close()
