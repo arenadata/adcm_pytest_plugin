@@ -43,29 +43,29 @@ def add_dummy_objects_to_adcm(adcm_client):
     with allure.step("Create provider"):
         provider_bundle = adcm_client.upload_from_fs(get_data_dir(__file__, "provider"))
         provider = provider_bundle.provider_prototype().provider_create(name="Pre-uploaded provider")
-    with allure.step("Create cluster for the further import"):
+    with allure.step("Create cluster for the further import and add hosts to it"):
         cluster_to_import_bundle = adcm_client.upload_from_fs(get_data_dir(__file__, "cluster_to_import"))
         cluster_to_import = cluster_to_import_bundle.cluster_prototype().cluster_create(
             name="Pre-uploaded cluster for the import"
         )
+        for i in range(6):
+            cluster_to_import.host_add(provider.host_create(fqdn=f"pre-uploaded-host-import-{i}"))
     with allure.step("Create a cluster with service"):
         cluster_bundle = adcm_client.upload_from_fs(get_data_dir(__file__, "cluster_with_service"))
         cluster = cluster_bundle.cluster_prototype().cluster_create(name="Pre-uploaded cluster with services")
         cluster.bind(cluster_to_import)
+    with allure.step("Create hosts and add them to cluster"):
+        hosts = tuple((cluster.host_add(provider.host_create(fqdn=f"pre-uploaded-host-{i}")) for i in range(6)))
     with allure.step("Add services"):
         service_first = cluster.service_add(name="First service")
         service_second = cluster.service_add(name="Second service")
-    with allure.step("Add hosts"):
-        host_first = provider.host_create(fqdn="pre-uploaded-host-in-cluster")
-        host_second = provider.host_create(fqdn="pre-uploaded-host-in-cluster-second")
-        cluster.host_add(host_first)
-        cluster.host_add(host_second)
-    with allure.step("Set components"):
-        cluster.hostcomponent_set(
-            (host_first, service_first.component(name="first")),
-            (host_second, service_first.component(name="second")),
-            (host_second, service_second.component(name="third")),
+        components = (
+            service_first.component(name="first"),
+            service_first.component(name="second"),
+            service_second.component(name="third"),
         )
+    with allure.step("Add hosts to cluster and set hostcomponent map"):
+        cluster.hostcomponent_set(*[(host, component) for host in hosts for component in components])
     with allure.step("Run task"):
         task = cluster.action(name="action_on_cluster").run()
         task.wait()
