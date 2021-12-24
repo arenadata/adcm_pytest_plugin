@@ -30,6 +30,8 @@ class BundleError(BuiltinLikeAssertionError):
             raise SystemctlError(message)
         if "Cannot allocate memory" in message:
             raise AllocateMemoryError(message)
+        if "Timeout when waiting for" in message:
+            raise TimeoutWaitingForError(message)
 
 
 class AnsibleError(BundleError):
@@ -42,3 +44,7 @@ class SystemctlError(BundleError):
 
 class AllocateMemoryError(BundleError):
     """Cannot allocate memory"""
+
+
+class TimeoutWaitingForError(BundleError):
+    """Timeout when waiting for"""
