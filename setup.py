@@ -19,13 +19,13 @@ setup(
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     include_package_data=True,
-    version="4.14.1",
+    version="4.14.2",
     # the following makes a plugin available to pytest
     entry_points={"pytest11": ["adcm_pytest_plugin = adcm_pytest_plugin.plugin"]},
     # custom PyPI classifier for pytest plugins
     install_requires=[
         "pytest",
-        "docker==5.0.0",
+        "docker>=5.0.0",
         "adcm_client>=2021.11.22.12",
         "allure-pytest>=2.9.42",
         "requests",
