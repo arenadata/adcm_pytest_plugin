@@ -31,7 +31,7 @@ from adcm_pytest_plugin.plugin import options
 from adcm_pytest_plugin.steps.asserts import assert_action_result
 
 
-def _get_error_text_from_task_logs(task: Task):
+def get_error_text_from_task_logs(task: Task) -> str:
     """
     Extract error message from task logs
 
@@ -45,18 +45,18 @@ def _get_error_text_from_task_logs(task: Task):
     >>> test_task.job_list = lambda status: [test_job]
     >>> stdout_log.content = "fatal: Some ERROR\\nTASK [api : something] **********\\n"
     >>> stderr_log.content = "ERROR! the role 'monitoring' was not found\\n"
-    >>> _get_error_text_from_task_logs(test_task)
+    >>> get_error_text_from_task_logs(test_task)
     "ERROR! the role 'monitoring' was not found"
     >>> stdout_log.content = "fatal: Some ERROR\\nTASK [api : something] **********\\n"
     >>> stderr_log.content = "[WARNING] conditional statements should not include jinja2 templating\\n"
-    >>> _get_error_text_from_task_logs(test_task)
+    >>> get_error_text_from_task_logs(test_task)
     'fatal: Some ERROR'
     >>> error_obj = lambda: None
     >>> error_obj._data = dict()
     >>> error_obj._data["code"] = "LOG_NOT_FOUND"
     >>> multijob_logs_error = ErrorMessage(error=error_obj)
     >>> test_job.log_list = lambda: (_ for _ in ()).throw(multijob_logs_error)
-    >>> _get_error_text_from_task_logs(test_task)
+    >>> get_error_text_from_task_logs(test_task)
     ''
     """
 
@@ -394,7 +394,7 @@ def wait_for_task_and_assert_result(task: Task, status: str, action_name: str = 
     result = task.wait(timeout=timeout)
     ansible_error = ""
     if result != status and status == "success":
-        ansible_error = _get_error_text_from_task_logs(task)
+        ansible_error = get_error_text_from_task_logs(task)
     assert_action_result(
         name=action_name or task.action().name,
         result=result,
