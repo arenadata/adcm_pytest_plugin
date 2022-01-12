@@ -43,7 +43,8 @@ def add_dummy_objects_to_adcm(adcm_client):
     with allure.step("Create provider"):
         provider_bundle = adcm_client.upload_from_fs(get_data_dir(__file__, "provider"))
         provider = provider_bundle.provider_prototype().provider_create(name="Pre-uploaded provider")
-        _ = provider_bundle.provider_prototype().provider_create(name="Pre-uploaded second provider")
+        second_provider = provider_bundle.provider_prototype().provider_create(name="Pre-uploaded second provider")
+        _ = [second_provider.host_create(fqdn=f"pre-uploaded-host-second-provider-{i}") for i in range(6)]
     with allure.step("Create cluster for the further import and add hosts to it"):
         cluster_to_import_bundle = adcm_client.upload_from_fs(get_data_dir(__file__, "cluster_to_import"))
         cluster_to_import = cluster_to_import_bundle.cluster_prototype().cluster_create(
