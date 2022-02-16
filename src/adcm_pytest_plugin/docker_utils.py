@@ -302,7 +302,7 @@ def split_tag(image_name: str):
     return parse_repository_tag(image_name)
 
 
-def _wait_for_adcm_container_init(container, container_ip, port, timeout=120):
+def _wait_for_adcm_container_init(container, container_ip, port, timeout=300):
     adcm_api_url = f"http://{container_ip}:{port}/api/v1/"
     with allure.step(f"Waiting for ADCM API on {adcm_api_url}"):
         if not wait_for_url(adcm_api_url, timeout):
