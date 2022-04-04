@@ -12,6 +12,7 @@
 
 """Main module of plugin with options and hooks"""
 # pylint: disable=wildcard-import,unused-wildcard-import
+import itertools
 import json
 import os
 import pathlib
@@ -186,8 +187,9 @@ def _get_unique_sorted_tags(tags: List[str]) -> List[str]:
 
 
 def _get_adcm_tags() -> List[str]:
-    """Return unsorted list of ADCM tags from hub.arenadata.io (newest tag is last)"""
-    return requests.get("https://hub.arenadata.io/v2/adcm/adcm/tags/list").json()["tags"]
+    """Return unsorted list of ADCM tags from hub.arenadata.io"""
+    artifacts_data = requests.get("https://hub.arenadata.io/api/v2.0/projects/adcm/repositories/adcm/artifacts").json()
+    return list(itertools.chain.from_iterable([tag["name"] for tag in artifact["tags"]] for artifact in artifacts_data))
 
 
 def _filter_adcm_versions_from_tags(adcm_tags: List[str], min_ver: str) -> Iterator[str]:
