@@ -45,7 +45,7 @@ def load_cluster(adcm: ADCM, file_path: str, password: str) -> None:
     arguments = _prepare_cmd_arguments(adcm, f"python3 /adcm/python/manage.py {command} {file_path}")
     with _run_in_subprocess(arguments) as process:
         stdout, stderr = _type_password(process, password)
-    if 'Load successfully ended' in stdout:
+    if "Load successfully ended" in stdout:
         return
     _command_failed(command, stdout, stderr)
 
