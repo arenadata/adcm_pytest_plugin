@@ -559,3 +559,29 @@ def suppress_docker_wait_error():
             "Failed to wait container state at the specified timeout\n"
             "It's workaround of docker-py error, see https://github.com/docker/docker-py/issues/1966"
         )
+
+
+def is_file_presented_in_directory(container: Container, file: str, directory: str) -> bool:
+    """
+    Check if file is presented in directory in container
+    """
+    return file in container.exec_run(["ls", "-a", directory]).output.decode("utf-8")
+
+
+def copy_file_to_container(from_container: Container, to_container: Container, from_path: str, to_path: str) -> None:
+    """
+    Copy file from one container to another through local temp directory in /tmp
+    """
+    local_tempdir = f"{from_container.name}-to-{to_container.name}-{random_string(6)}"
+    _run_command_and_assert_result(
+        f"docker cp {from_container.name}:{from_path} /tmp/{local_tempdir}",
+        "Copy from container to filesystem failed.",
+    )
+    _run_command_and_assert_result(
+        f"docker cp /tmp/{local_tempdir} {to_container.name}:{to_path}", "Copy to container failed."
+    )
+
+
+def _run_command_and_assert_result(command: str, fail_message: str):
+    """Run `os.system` with given command and assert that result code is equal to 0"""
+    assert (result := os.system(command)) == 0, f"Operation failed. Exit code was {result}. Message: {fail_message}"
