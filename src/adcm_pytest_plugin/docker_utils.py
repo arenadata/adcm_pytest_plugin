@@ -407,6 +407,7 @@ class DockerWrapper:  # pylint: disable=too-few-public-methods
                 if (
                     "failed: port is already allocated" in err.explanation
                     or "bind: address already in use" in err.explanation  # noqa: W503
+                    or "bind: cannot assign requested address" in err.explanation  # noqa: W503
                 ):
                     # such error excepting leaves created container and there is
                     # no way to clean it other than from docker library
