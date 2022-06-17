@@ -41,7 +41,7 @@ def assert_state(obj: BaseAPIObject, state):
     elif hasattr(obj, "fqdn"):
         name = obj.fqdn
     else:
-        name = obj.__repr__()
+        name = obj.__repr__()  # pylint: disable=unnecessary-dunder-call
     with allure.step(f"Assert state of {obj.__class__.__name__} '{name}' to be equal to '{state}'"):
         assert obj.state == state, f"Object '{name}' have unexpected state - '{obj.state}'. " f"Expected - '{state}'"
 
