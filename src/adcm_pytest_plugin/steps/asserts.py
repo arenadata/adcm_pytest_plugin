@@ -14,6 +14,8 @@
 Common test asserts
 """
 
+from typing import Iterable
+
 import allure
 from adcm_client.objects import BaseAPIObject
 
@@ -36,12 +38,7 @@ def assert_state(obj: BaseAPIObject, state):
     AssertionError:
     """
     obj.reread()
-    if hasattr(obj, "name"):
-        name = obj.name
-    elif hasattr(obj, "fqdn"):
-        name = obj.fqdn
-    else:
-        name = obj.__repr__()  # pylint: disable=unnecessary-dunder-call
+    name = _get_name(obj)
     with allure.step(f"Assert state of {obj.__class__.__name__} '{name}' to be equal to '{state}'"):
         assert obj.state == state, f"Object '{name}' have unexpected state - '{obj.state}'. " f"Expected - '{state}'"
 
@@ -73,3 +70,40 @@ def assert_action_result(result: str, status: str, name="", additional_message="
         InfrastructureProblem.raise_if_suitable(message)
         BundleError.raise_if_suitable(message)
     assert result == status, message
+
+
+def assert_multi_state(obj: BaseAPIObject, multi_state: Iterable[str]) -> None:
+    """
+    Asserts object's multi-state to be equal to `multi_state` argument,
+    both are converted to `set`.
+
+    >>> some_obj = lambda: None
+    >>> some_obj.reread = lambda: None
+    >>> some_obj.multi_state = ["prepared", "initialized"]
+    >>> assert_multi_state(some_obj, ["prepared", "initialized"]) is None
+    True
+    >>> assert_multi_state(some_obj, ["started"]) # doctest: +IGNORE_EXCEPTION_DETAIL
+    Traceback (most recent call last):
+    ...
+    AssertionError:
+    >>> assert_multi_state(some_obj, ["prepared", "initialized", "started"]) # doctest: +IGNORE_EXCEPTION_DETAIL
+    Traceback (most recent call last):
+    ...
+    AssertionError:
+    """
+    obj.reread()
+    expected_state = set(multi_state)
+    name = _get_name(obj)
+    with allure.step(f"Assert multi-state of {obj.__class__.__name__} '{name}' to be equal to '{expected_state}'"):
+        actual_state = set(obj.multi_state)
+        assert (
+            actual_state == expected_state
+        ), f"Object has incorrect multi-state.\nExpected: {expected_state}\nActual: {actual_state}"
+
+
+def _get_name(obj: BaseAPIObject) -> str:
+    if hasattr(obj, "name"):
+        return obj.name
+    if hasattr(obj, "fqdn"):
+        return obj.fqdn
+    return repr(obj)
