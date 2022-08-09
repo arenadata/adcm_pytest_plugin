@@ -66,7 +66,7 @@ def logrotate(
     if disable_logs:
         options.append("--disable-logs")
 
-    _run_command(adcm, logrotate, options)
+    _run_command(adcm, "logrotate", options)
 
 
 def clearaudit(adcm: ADCM) -> None:
