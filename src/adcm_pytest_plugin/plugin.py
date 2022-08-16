@@ -24,6 +24,8 @@ import pytest
 import requests
 from _pytest.config import Config
 from docker.utils import parse_repository_tag
+from requests.adapters import HTTPAdapter
+from urllib3 import Retry
 from version_utils import rpm
 
 from .fixtures import *  # noqa: F401, F403
@@ -188,7 +190,10 @@ def _get_unique_sorted_tags(tags: List[str]) -> List[str]:
 
 def _get_adcm_tags() -> List[str]:
     """Return unsorted list of ADCM tags from hub.arenadata.io"""
-    artifacts_data = requests.get("https://hub.arenadata.io/api/v2.0/projects/adcm/repositories/adcm/artifacts").json()
+    adapter = HTTPAdapter(max_retries=Retry())
+    http = requests.Session()
+    http.mount("https://", adapter)
+    artifacts_data = http.get("https://hub.arenadata.io/api/v2.0/projects/adcm/repositories/adcm/artifacts").json()
     return list(itertools.chain.from_iterable([tag["name"] for tag in artifact["tags"]] for artifact in artifacts_data))
 
 
