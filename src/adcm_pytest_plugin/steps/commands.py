@@ -14,7 +14,7 @@
 import os.path
 import subprocess
 from contextlib import contextmanager
-from typing import List, Generator, Tuple, Optional, Literal
+from typing import List, Generator, Tuple, Optional, Literal, Collection
 
 import allure
 
@@ -56,21 +56,28 @@ def load_cluster(adcm: ADCM, file_path: str, password: str) -> None:
 
 def logrotate(
     adcm: ADCM, target: Optional[Literal["all", "job", "config", "nginx"]] = None, disable_logs: bool = False
-):
+) -> None:
     """
     Run rotation of logs (job/config/nginx) with "logrotate" command.
     """
-    step_message = 'Run ADCM command "logrotate"'
     options = []
     if target is not None:
         options.append(f"--target {target}")
     if disable_logs:
         options.append("--disable-logs")
-    if options:
-        step_message += f"with options: {' '.join(options)}"
 
-    with allure.step(step_message):
-        command = "logrotate"
+    _run_command(adcm, "logrotate", options)
+
+
+def clearaudit(adcm: ADCM) -> None:
+    """
+    Run audit log cleanup with "clearaudit" command
+    """
+    _run_command(adcm, "clearaudit")
+
+
+def _run_command(adcm: ADCM, command: str, options: Optional[Collection[str]] = ()):
+    with allure.step(f'Run ADCM command "{command}"' + (f" with options {' '.join(options)}" if options else "")):
         exit_code, output = _run_with_docker_exec(
             adcm,
             [
