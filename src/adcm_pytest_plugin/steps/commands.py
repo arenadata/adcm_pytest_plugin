@@ -11,18 +11,18 @@
 # limitations under the License.
 
 """Execute ADCM Django commands"""
+
 import os.path
 import subprocess
 from contextlib import contextmanager
-from typing import List, Generator, Tuple, Optional, Literal, Collection
+from typing import Collection, Generator, List, Literal, Optional, Tuple
 
 import allure
 
 from adcm_pytest_plugin.docker_utils import ADCM, is_file_presented_in_directory
 
-
-_ACTIVATE_DEFAULT_VENV = "source /adcm/venv/default/bin/activate"
-_RUN_MANAGE_PY = "python3 /adcm/python/manage.py"
+_ACTIVATE_DEFAULT_VENV = ". /adcm/venv/default/bin/activate"
+_RUN_MANAGE_PY = "python /adcm/python/manage.py"
 
 
 @allure.step('Run ADCM command "dumpcluster" on cluster {cluster_id} to file {file_path}')
