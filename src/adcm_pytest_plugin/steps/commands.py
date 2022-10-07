@@ -18,11 +18,13 @@ from contextlib import contextmanager
 from typing import Collection, Generator, List, Literal, Optional, Tuple
 
 import allure
+import requests
+from version_utils import rpm
 
 from adcm_pytest_plugin.docker_utils import ADCM, is_file_presented_in_directory
 
-_ACTIVATE_DEFAULT_VENV = ". /adcm/venv/default/bin/activate"
-_RUN_MANAGE_PY = "python /adcm/python/manage.py"
+_DEFAULT_VENV = "/adcm/venv/default/bin/activate"
+_MANAGE_PY = "/adcm/python/manage.py"
 
 
 @allure.step('Run ADCM command "dumpcluster" on cluster {cluster_id} to file {file_path}')
@@ -31,7 +33,8 @@ def dump_cluster(adcm: ADCM, cluster_id: int, file_path: str, password: str) -> 
     Dump cluster with "dumpcluster" command.
     """
     command = "dumpcluster"
-    arguments = _prepare_cmd_arguments(adcm, f"{_RUN_MANAGE_PY} {command} -c {cluster_id} -o {file_path}")
+    _, python = _get_command_prefixes(adcm)
+    arguments = _prepare_cmd_arguments(adcm, f"{python} {_MANAGE_PY} {command} -c {cluster_id} -o {file_path}")
     dump_dir, dump_file = os.path.dirname(file_path), os.path.basename(file_path)
     with _run_in_subprocess(arguments) as process:
         stdout, stderr = _type_password(process, password)
@@ -46,7 +49,8 @@ def load_cluster(adcm: ADCM, file_path: str, password: str) -> None:
     Load cluster with "loadcluster" command.
     """
     command = "loadcluster"
-    arguments = _prepare_cmd_arguments(adcm, f"{_RUN_MANAGE_PY} {command} {file_path}")
+    _, python = _get_command_prefixes(adcm)
+    arguments = _prepare_cmd_arguments(adcm, f"{python} {_MANAGE_PY} {command} {file_path}")
     with _run_in_subprocess(arguments) as process:
         stdout, stderr = _type_password(process, password)
     if "Load successfully ended" in stdout:
@@ -77,13 +81,15 @@ def clearaudit(adcm: ADCM) -> None:
 
 
 def _run_command(adcm: ADCM, command: str, options: Optional[Collection[str]] = ()):
+    activate_venv, python = _get_command_prefixes
     with allure.step(f'Run ADCM command "{command}"' + (f" with options {' '.join(options)}" if options else "")):
         exit_code, output = _run_with_docker_exec(
             adcm,
             [
                 "sh",
                 "-c",
-                f"{_ACTIVATE_DEFAULT_VENV} && {_RUN_MANAGE_PY} {command} {' '.join(options) if options else ''}",
+                f"{activate_venv} {_DEFAULT_VENV} && {python} {_MANAGE_PY} "
+                f"{command} {' '.join(options) if options else ''}",
             ],
         )
         if exit_code == 0:
@@ -102,6 +108,7 @@ def _prepare_cmd_arguments(adcm: ADCM, command: str) -> List[str]:
     """
     Prepare "args" required to execute interactive ADCM command from terminal
     """
+    activate_venv, _ = _get_command_prefixes(adcm)
     return [
         "docker",
         "exec",
@@ -109,7 +116,7 @@ def _prepare_cmd_arguments(adcm: ADCM, command: str) -> List[str]:
         adcm.container.name,
         "sh",
         "-c",
-        f"{_ACTIVATE_DEFAULT_VENV} && {command}",
+        f"{activate_venv} {_DEFAULT_VENV} && {command}",
     ]
 
 
@@ -157,3 +164,16 @@ def _docker_exec_command_failed(command: str, exit_code: int, output: bytes):
         output.decode("utf-8"), name="command output (from `docker_exec`)", attachment_type=allure.attachment_type.TEXT
     )
     raise AssertionError(f'Command "{command}" failed with {exit_code} exit code.\nCheck attachments for more details.')
+
+
+def _get_command_prefixes(adcm: ADCM) -> Tuple[str, str]:
+    """Get venv activation and python prefixes"""
+    if rpm.compare_versions(_get_adcm_version(adcm), "2022.10.04.17") > 0:
+        return ".", "python"
+    return "source", "python3"
+
+
+def _get_adcm_version(adcm: ADCM) -> str:
+    response = requests.get(f"{adcm.url}/api/v1/info/")
+    response.raise_for_status()
+    return response.json()["adcm_version"]
