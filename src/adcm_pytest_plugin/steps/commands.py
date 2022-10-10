@@ -81,7 +81,7 @@ def clearaudit(adcm: ADCM) -> None:
 
 
 def _run_command(adcm: ADCM, command: str, options: Optional[Collection[str]] = ()):
-    activate_venv, python = _get_command_prefixes
+    activate_venv, python = _get_command_prefixes(adcm)
     with allure.step(f'Run ADCM command "{command}"' + (f" with options {' '.join(options)}" if options else "")):
         exit_code, output = _run_with_docker_exec(
             adcm,
