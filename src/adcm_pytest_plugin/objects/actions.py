@@ -52,8 +52,8 @@ class ActionRunInfo:
     @classmethod
     def from_action(cls, action: Action, expected_status: str = "Undefined"):
         """Create instance from Action obj"""
-        proto = Prototype(api=action._api, prototype_id=action.prototype_id)
-        bundle = Bundle(api=action._api, bundle_id=proto.bundle_id)
+        proto = Prototype(api=action._api, id=action.prototype_id)
+        bundle = Bundle(api=action._api, id=proto.bundle_id)
         return cls(
             action_name=action.name,
             expected_status=expected_status,
@@ -92,9 +92,9 @@ class ActionsSpec:
     @classmethod
     def from_action(cls, action: Action):
         """Create instance from Action obj"""
-        proto = Prototype(api=action._api, prototype_id=action.prototype_id)
+        proto = Prototype(api=action._api, id=action.prototype_id)
         actions = [action["name"] for action in proto.actions]  # pylint: disable=not-an-iterable
-        bundle = Bundle(api=action._api, bundle_id=proto.bundle_id)
+        bundle = Bundle(api=action._api, id=proto.bundle_id)
 
         return cls(
             actions=actions,
