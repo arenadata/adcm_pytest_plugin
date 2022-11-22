@@ -23,7 +23,7 @@ from typing import Callable, Iterable, List, Optional, Tuple, Type, Union
 
 import allure
 import pytest
-from _pytest.fixtures import FixtureFunctionMarker, _FixtureFunction
+from _pytest.fixtures import FixtureFunctionMarker, FixtureFunction
 from _pytest.mark import MarkDecorator
 from adcm_client.base import ObjectNotFound
 from adcm_client.objects import Cluster, Host, Task
@@ -317,7 +317,7 @@ def parametrize_by_data_subdirs(filename: str, *path) -> MarkDecorator:
 
 def fixture_parametrized_by_data_subdirs(
     filename: str, *path, scope="function"
-) -> Union[FixtureFunctionMarker, _FixtureFunction]:
+) -> Union[FixtureFunctionMarker, FixtureFunction]:
     """That is a combination of parametrized fixture and get_data_subdirs_as parameters
 
     That is useful when you want to parametrize fixture over subdirs.
