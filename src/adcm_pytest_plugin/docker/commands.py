@@ -12,72 +12,20 @@
 
 """Execute ADCM Django commands"""
 
-import os.path
 import subprocess
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Collection, Generator, List, Literal, Optional, Tuple
 
 import allure
 import requests
 from version_utils import rpm
 
-from adcm_pytest_plugin.docker_utils import ADCM, is_file_presented_in_directory
+from adcm_pytest_plugin.docker.adcm import ADCM
+from adcm_pytest_plugin.docker.utils import is_file_presented_in_directory
 
 _DEFAULT_VENV = "/adcm/venv/default/bin/activate"
 _MANAGE_PY = "/adcm/python/manage.py"
-
-
-@allure.step('Run ADCM command "dumpcluster" on cluster {cluster_id} to file {file_path}')
-def dump_cluster(adcm: ADCM, cluster_id: int, file_path: str, password: str) -> None:
-    """
-    Dump cluster with "dumpcluster" command.
-    """
-    command = "dumpcluster"
-    _, python = _get_command_prefixes(adcm)
-    arguments = _prepare_cmd_arguments(adcm, f"{python} {_MANAGE_PY} {command} -c {cluster_id} -o {file_path}")
-    dump_dir, dump_file = os.path.dirname(file_path), os.path.basename(file_path)
-    with _run_in_subprocess(arguments) as process:
-        stdout, stderr = _type_password(process, password)
-    if file_path in stdout and is_file_presented_in_directory(adcm.container, dump_file, dump_dir):
-        return
-    _interactive_command_failed(command, stdout, stderr)
-
-
-@allure.step('Run ADCM command "loadcluster" from file {file_path}')
-def load_cluster(adcm: ADCM, file_path: str, password: str) -> None:
-    """
-    Load cluster with "loadcluster" command.
-    """
-    command = "loadcluster"
-    _, python = _get_command_prefixes(adcm)
-    arguments = _prepare_cmd_arguments(adcm, f"{python} {_MANAGE_PY} {command} {file_path}")
-    with _run_in_subprocess(arguments) as process:
-        stdout, stderr = _type_password(process, password)
-    if "Load successfully ended" in stdout:
-        return
-    _interactive_command_failed(command, stdout, stderr)
-
-
-def logrotate(
-    adcm: ADCM, target: Optional[Literal["all", "job", "config", "nginx"]] = None, disable_logs: bool = False
-) -> None:
-    """
-    Run rotation of logs (job/config/nginx) with "logrotate" command.
-    """
-    options = []
-    if target is not None:
-        options.append(f"--target {target}")
-    if disable_logs:
-        options.append("--disable-logs")
-
-    _run_command(adcm, "logrotate", options)
-
-
-def clearaudit(adcm: ADCM) -> None:
-    """
-    Run audit log cleanup with "clearaudit" command
-    """
-    _run_command(adcm, "clearaudit")
 
 
 def _run_command(adcm: ADCM, command: str, options: Optional[Collection[str]] = ()):
@@ -177,3 +125,56 @@ def _get_adcm_version(adcm: ADCM) -> str:
     response = requests.get(f"{adcm.url}/api/v1/info/")
     response.raise_for_status()
     return response.json()["adcm_version"]
+
+
+@allure.step('Run ADCM command "dumpcluster" on cluster {cluster_id} to file {file_path}')
+def dump_cluster(adcm: ADCM, cluster_id: int, file_path: str, password: str) -> None:
+    """
+    Dump cluster with "dumpcluster" command.
+    """
+    command = "dumpcluster"
+    _, python = _get_command_prefixes(adcm)
+    arguments = _prepare_cmd_arguments(adcm, f"{python} {_MANAGE_PY} {command} -c {cluster_id} -o {file_path}")
+    file = Path(file_path)
+    with _run_in_subprocess(arguments) as process:
+        stdout, stderr = _type_password(process, password)
+    if file_path in stdout and is_file_presented_in_directory(adcm.container, file.name, file.parent):
+        return
+    _interactive_command_failed(command, stdout, stderr)
+
+
+@allure.step('Run ADCM command "loadcluster" from file {file_path}')
+def load_cluster(adcm: ADCM, file_path: str, password: str) -> None:
+    """
+    Load cluster with "loadcluster" command.
+    """
+    command = "loadcluster"
+    _, python = _get_command_prefixes(adcm)
+    arguments = _prepare_cmd_arguments(adcm, f"{python} {_MANAGE_PY} {command} {file_path}")
+    with _run_in_subprocess(arguments) as process:
+        stdout, stderr = _type_password(process, password)
+    if "Load successfully ended" in stdout:
+        return
+    _interactive_command_failed(command, stdout, stderr)
+
+
+def logrotate(
+    adcm: ADCM, target: Optional[Literal["all", "job", "config", "nginx"]] = None, disable_logs: bool = False
+) -> None:
+    """
+    Run rotation of logs (job/config/nginx) with "logrotate" command.
+    """
+    options = []
+    if target is not None:
+        options.append(f"--target {target}")
+    if disable_logs:
+        options.append("--disable-logs")
+
+    _run_command(adcm, "logrotate", options)
+
+
+def clearaudit(adcm: ADCM) -> None:
+    """
+    Run audit log cleanup with "clearaudit" command
+    """
+    _run_command(adcm, "clearaudit")

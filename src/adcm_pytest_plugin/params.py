@@ -22,16 +22,8 @@ Example:
 
 import pytest
 
-__all__ = ["including_https", "https_only", "clean_adcm_only"]
-
 
 including_https = pytest.mark.parametrize(
     "adcm_https", [pytest.param(True, id="https"), pytest.param(False, id="http")], indirect=True
 )
 https_only = pytest.mark.parametrize("adcm_https", [True], indirect=True)
-
-clean_adcm_only = pytest.mark.parametrize(
-    "additional_adcm_init_config",
-    [pytest.param({}, id="clean_adcm")],
-    indirect=True,
-)

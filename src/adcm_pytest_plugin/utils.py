@@ -19,7 +19,7 @@ import string
 from contextlib import AbstractContextManager
 from inspect import getfullargspec
 from time import sleep, time
-from typing import Callable, Iterable, List, Optional, Tuple, Type, Union
+from typing import Callable, Iterable, List, Optional, Tuple, Type, Union, Collection
 
 import allure
 import pytest
@@ -30,6 +30,11 @@ from adcm_client.objects import Cluster, Host, Task
 from allure_commons.reporter import AllureReporter
 from allure_pytest.listener import AllureListener
 from decorator import decorator
+
+
+# key to use for setting postgres password via env variables in ADCM and Postgres containers
+# stored here to avoid circular imports
+ADCM_PASS_KEY = "POSTGRES_ADCM_PASS"
 
 
 def remove_host(host: Host) -> Task:
@@ -388,7 +393,6 @@ def wait_until_step_succeeds(func, timeout: Union[int, float] = 300, period: Uni
                 last_error = err
                 sleep(period)
                 continue
-            break
         else:
             raise AssertionError(
                 f'Step "{func.__name__}" failed after retrying {timeout} seconds. ' f"The last error was: {last_error}"
@@ -487,3 +491,22 @@ def func_name_to_title(func_name):
     func_name, params = found[0]
     func_name = func_name.replace("_", " ").capitalize()
     return func_name + params
+
+
+def retry(
+    func: Callable[..., bool],
+    *args,
+    attempts_: int = 5,
+    wait_between_: float = 1.0,
+    err_type_: Type[Exception] = AssertionError,
+    err_message_: Union[str, Callable[[], str]] = "Failed to perform check",
+    **kwargs,
+) -> None:
+    for _ in range(attempts_):
+        if func(*args, **kwargs):
+            return
+        sleep(wait_between_)
+
+    message = err_message_ if not callable(err_message_) else err_message_()
+
+    raise err_type_(f"{message}\nAttempts: {attempts_}\nWait between attempts: {wait_between_}")

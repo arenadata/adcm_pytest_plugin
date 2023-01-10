@@ -11,6 +11,7 @@
 # limitations under the License.
 
 """Main module of plugin with options and hooks"""
+
 # pylint: disable=wildcard-import,unused-wildcard-import
 import itertools
 import json
