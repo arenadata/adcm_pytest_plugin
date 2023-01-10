@@ -23,7 +23,7 @@ from contextlib import contextmanager, suppress
 from dataclasses import asdict, dataclass
 from gzip import compress
 from tempfile import TemporaryDirectory
-from typing import Generator, Optional, Tuple
+from typing import Generator, Optional, Tuple, NamedTuple
 
 import allure
 import docker
@@ -36,11 +36,12 @@ from coreapi.exceptions import ErrorMessage
 from docker import DockerClient
 from docker.errors import APIError, ImageNotFound, NotFound
 from docker.models.containers import Container
+from docker.models.networks import Network
 from docker.utils import parse_repository_tag
 from retry.api import retry_call
 
 from .common import add_dummy_objects_to_adcm
-from .utils import random_string
+from .utils import random_string, ADCM_PASS_KEY
 
 MIN_DOCKER_PORT = 8000
 MAX_DOCKER_PORT = 9000
@@ -314,6 +315,11 @@ def _wait_for_adcm_container_init(container, container_ip, port, timeout=300):
             raise TimeoutError(f"ADCM API has not responded in {timeout} seconds{additional_message}")
 
 
+class PostgresInfo(NamedTuple):
+    container: Container
+    network: Network
+
+
 @dataclass
 class ContainerConfig:
     """Dataclass for encapsulating docker container run options"""
@@ -357,10 +363,11 @@ class ContainerConfig:
 class DockerWrapper:  # pylint: disable=too-few-public-methods
     """Class for connection to local docker daemon and spawn ADCM instances."""
 
-    __slots__ = ("client",)
+    __slots__ = ("client", "postgres")
 
-    def __init__(self, base_url="unix://var/run/docker.sock", dc=None):
+    def __init__(self, base_url="unix://var/run/docker.sock", dc=None, postgres: Optional[PostgresInfo] = None):
         self.client = dc if dc else docker.DockerClient(base_url=base_url, timeout=120)
+        self.postgres = postgres
 
     def run_adcm_container_from_config(self, config: ContainerConfig) -> Tuple[Container, ContainerConfig]:
         """
@@ -381,8 +388,9 @@ class DockerWrapper:  # pylint: disable=too-few-public-methods
             config.bind_ip = base_url[ip_start:ip_end]
 
         with allure.step(f"Run ADCM container from {config.image}:{config.tag}"):
+            run_kwargs = self._prepare_run_kwargs()
             container, config.bind_port, config.bind_secure_port = (
-                self._run_container(config) if config.bind_port else self._run_container_on_free_port(config)
+                self._run_container(config, **run_kwargs) if config.bind_port else self._run_container_on_free_port(config, **run_kwargs)
             )
             config.api_ip, config.api_port, config.api_secure_port = self._get_adcm_ip_and_port(config, container)
             allure.attach(
@@ -394,7 +402,7 @@ class DockerWrapper:  # pylint: disable=too-few-public-methods
 
         return container, config
 
-    def _run_container_on_free_port(self, config: ContainerConfig) -> Tuple[Container, int, int]:
+    def _run_container_on_free_port(self, config: ContainerConfig, **kwargs) -> Tuple[Container, int, int]:
         free_ports = _yield_ports(config.bind_ip)
         config.bind_port = next(free_ports)
         if config.https:
@@ -402,7 +410,7 @@ class DockerWrapper:  # pylint: disable=too-few-public-methods
 
         for _ in range(0, CONTAINER_START_RETRY_COUNT):
             try:
-                return self._run_container(config)
+                return self._run_container(config, **kwargs)
             except APIError as err:
                 if (
                     "failed: port is already allocated" in err.explanation
@@ -419,7 +427,7 @@ class DockerWrapper:  # pylint: disable=too-few-public-methods
                     raise err
         raise RetryCountExceeded(f"Unable to start container after {CONTAINER_START_RETRY_COUNT} retries")
 
-    def _run_container(self, config: ContainerConfig) -> (Container, int):
+    def _run_container(self, config: ContainerConfig, **kwargs) -> Tuple[Container, int, int]:
         ports = {"8000": (config.bind_ip, config.bind_port)}
         if config.bind_secure_port:
             ports["8443"] = (config.bind_ip, config.bind_secure_port)
@@ -432,6 +440,7 @@ class DockerWrapper:  # pylint: disable=too-few-public-methods
                 labels=config.labels,
                 name=config.name,
                 detach=True,
+                **kwargs,
             ),
             config.bind_port,
             config.bind_secure_port,
@@ -447,6 +456,30 @@ class DockerWrapper:  # pylint: disable=too-few-public-methods
             api_port = "8000"
             api_secure_port = "8443"
         return api_ip, api_port, api_secure_port
+
+    def _prepare_run_kwargs(self) -> dict:
+        if not self.postgres:
+            return {}
+
+        container = self.postgres.container
+        variable_prefix = f"{ADCM_PASS_KEY}="
+        password_record=next(
+            filter(lambda rec: rec.startswith(variable_prefix), container.attrs["Config"]["Env"]),
+            None
+        )
+        if not password_record:
+            raise RuntimeError("Failed to get ADCM postgres password from postgres container")
+
+        return {
+            "network": self.postgres.network.name,
+            "environment": [
+                password_record,
+                "DB_NAME=adcm",
+                "DB_USER=adcm",
+                f"DB_HOST={container.name}",
+                "DB_PORT=5432",
+            ]
+        }
 
 
 class ADCM:
@@ -525,6 +558,20 @@ class ADCM:
                 self.container_config
             )
 
+
+class ADCMWithPostgres(ADCM):
+
+    def __init__(self, docker_wrapper: DockerWrapper, container_config: ContainerConfig):
+        self.docker_wrapper = docker_wrapper
+        # run ADCM container
+        self.container, self.container_config = self.docker_wrapper.run_adcm_container_from_config(
+            container_config
+        )
+
+    @allure.step("Upgrade ADCM to {target}")
+    def upgrade(self, target: Tuple[str, str]) -> None:
+        # TODO implement upgrade without volumes
+        raise NotImplemented
 
 def remove_docker_image(repo: str, tag: str, dc: DockerClient):
     """Remove docker image"""

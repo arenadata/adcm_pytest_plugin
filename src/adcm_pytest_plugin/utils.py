@@ -32,6 +32,10 @@ from allure_pytest.listener import AllureListener
 from decorator import decorator
 
 
+# key to use for setting postgres password via env variables in ADCM and Postgres containers
+# stored here to avoid circular imports
+ADCM_PASS_KEY = "POSTGRES_ADCM_PASS"
+
 def remove_host(host: Host) -> Task:
     """
     Run action remove for host

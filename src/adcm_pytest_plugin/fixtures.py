@@ -14,16 +14,21 @@ import socket
 import time
 import uuid
 from contextlib import suppress
-from typing import Generator
+from pathlib import Path
+from typing import Generator, Optional, NamedTuple
 
 import allure
-import docker
 import ifaddr
 import pytest
 from _pytest.fixtures import SubRequest
 from _pytest.terminal import TerminalReporter
 from adcm_client.objects import ADCMClient
 from allure_commons.utils import uuid4
+from docker import from_env, DockerClient
+from docker.errors import ImageNotFound
+from docker.models.containers import Container
+from docker.models.images import Image
+from docker.models.networks import Network
 from docker.utils import parse_repository_tag
 from requests.exceptions import ReadTimeout as DockerReadTimeout
 
@@ -37,28 +42,30 @@ from .docker_utils import (
     gather_adcm_data_from_container,
     is_docker,
     remove_container_volumes,
-    remove_docker_image,
+    remove_docker_image, ADCMWithPostgres, PostgresInfo,
 )
-from .utils import allure_reporter, check_mutually_exclusive
+from .utils import allure_reporter, check_mutually_exclusive, random_string, ADCM_PASS_KEY
 
 DATADIR = utils.get_data_dir(__file__)
 
-__all__ = [
-    "image",
-    "cmd_opts",
-    "bind_container_ip",
-    "adcm_fs",
-    "adcm_ss",
-    "adcm_ms",
-    "extra_adcm_fs",
-    "adcm_is_upgradable",
-    "adcm_https",
-    "sdk_client_ms",
-    "sdk_client_fs",
-    "sdk_client_ss",
-    "adcm_api_credentials",
-    "additional_adcm_init_config",
-]
+# __all__ = [
+#     "image",
+#     "cmd_opts",
+#     "bind_container_ip",
+#     "adcm_fs",
+#     "adcm_ss",
+#     "adcm_ms",
+#     "extra_adcm_fs",
+#     "adcm_is_upgradable",
+#     "adcm_https",
+#     "sdk_client_ms",
+#     "sdk_client_fs",
+#     "sdk_client_ss",
+#     "adcm_api_credentials",
+#     "additional_adcm_init_config",
+#     "adcm_initial_container_config",
+#     "postgres",
+# ]
 
 
 @allure.title("ADCM credentials")
@@ -99,10 +106,92 @@ def bind_container_ip(cmd_opts):
     return ip
 
 
+@pytest.fixture(scope="session")
+def adcm_initial_container_config(request, bind_container_ip, cmd_opts, adcm_https) -> ContainerConfig:
+    # if image fixture was indirectly parametrized
+    # use 'adcm_repo' and 'adcm_tag' from parametrisation
+    if hasattr(request, "param"):
+        adcm_repo, adcm_tag = request.param
+    # if there is no parametrization check if adcm_image option is passed
+    elif cmd_opts.adcm_image:
+        adcm_repo, adcm_tag = parse_repository_tag(cmd_opts.adcm_image)
+    else:
+        adcm_repo, adcm_tag = None, None
+    return ContainerConfig(
+        image=adcm_repo,
+        tag=adcm_tag,
+        bind_ip=bind_container_ip,
+        remove=False,
+        pull=not cmd_opts.nopull,
+        https=adcm_https,
+    )
+
+
+@pytest.fixture(scope="session")
+def docker_client(cmd_opts) -> DockerClient:
+    if cmd_opts.remote_docker:
+        return DockerClient(base_url=f"tcp://{cmd_opts.remote_docker}", timeout=120)
+
+    return from_env(timeout=120)
+
+
+@pytest.fixture(scope="session")
+def postgres_variables() -> dict:
+    return {
+        "POSTGRES_PASSWORD": "postgres",
+        ADCM_PASS_KEY: "password",
+    }
+
+
+@pytest.fixture(scope="session")
+def postgres_image(docker_client: DockerClient) -> Image:
+    # TODO add customization
+    repo, tag = "postgres", "latest"
+
+    try:
+        image = docker_client.images.get(name=f"{repo}:{tag}")
+    except ImageNotFound:
+        image = docker_client.images.pull(repository=repo, tag=tag)
+    # TODO attach image info to allure
+
+    return image
+
+
+@pytest.fixture(scope="session")
+def postgres(
+    docker_client: DockerClient, postgres_image: Image, adcm_initial_container_config, postgres_variables: dict
+) -> Optional[PostgresInfo]:
+    name = f"db-{random_string(6)}"
+    user_init_script = Path(__file__).parent / "static" / "adcm-init-user-db.sh"
+    network = docker_client.networks.create(f"network-for-{name}")
+    container: Container = docker_client.containers.run(
+        image=postgres_image.id,
+        name=name,
+        environment={**postgres_variables},
+        volumes={
+            str(user_init_script.absolute()): {"bind": "/docker-entrypoint-initdb.d/init-user-db.sh", "mode": "ro"}
+        },
+        network=network.name,
+        # if ADCM container is alive, postgres container should be alive too
+        remove=adcm_initial_container_config.remove,
+        detach=True,
+    )
+    yield PostgresInfo(container=container, network=network)
+    container.stop()
+
+
+
+# psql --username adcm --dbname adcm -c "\dt" | cat
+# @pytest.fixture(scope="function")
+# def db_cleanup(postgres):
+#     yield
+#     postgres.exec_run(["TRUNCATE"])
+
+
 # pylint: disable=redefined-outer-name, too-many-arguments
 @allure.title("ADCM Image")
 @pytest.fixture(scope="session")
-def image(request, cmd_opts, bind_container_ip, adcm_api_credentials, additional_adcm_init_config, adcm_https):
+def image(cmd_opts, adcm_api_credentials, additional_adcm_init_config, adcm_initial_container_config, docker_client):
     """That fixture creates ADCM container, waits until
     a database becomes initialised and stores that as images
     with random tag and name local/adcminit
@@ -128,34 +217,12 @@ def image(request, cmd_opts, bind_container_ip, adcm_api_credentials, additional
         if check_mutually_exclusive(cmd_opts, *opt_sets):
             raise Exception(f"wrong using of import parameters {', '.join(opt_sets)} are mutually exclusive")
 
-    if cmd_opts.remote_docker:
-        docker_client = docker.DockerClient(base_url=f"tcp://{cmd_opts.remote_docker}", timeout=120)
-    else:
-        docker_client = docker.from_env(timeout=120)
-
     params = {}
     if cmd_opts.staticimage:
         params["repo"], params["tag"] = parse_repository_tag(cmd_opts.staticimage)
-    # if image fixture was indirectly parametrized
-    # use 'adcm_repo' and 'adcm_tag' from parametrisation
-    if hasattr(request, "param"):
-        adcm_repo, adcm_tag = request.param
-    # if there is no parametrization check if adcm_image option is passed
-    elif cmd_opts.adcm_image:
-        adcm_repo, adcm_tag = parse_repository_tag(cmd_opts.adcm_image)
-    else:
-        adcm_repo, adcm_tag = None, None
 
-    container_config = ContainerConfig(
-        image=adcm_repo,
-        tag=adcm_tag,
-        bind_ip=bind_container_ip,
-        remove=False,
-        pull=not cmd_opts.nopull,
-        https=adcm_https,
-    )
     initializer = ADCMInitializer(
-        container_config=container_config,
+        container_config=adcm_initial_container_config,
         dc=docker_client,
         adcm_api_credentials=adcm_api_credentials,
         **params,
@@ -173,36 +240,40 @@ def image(request, cmd_opts, bind_container_ip, adcm_api_credentials, additional
     remove_docker_image(**init_image, dc=docker_client)
 
 
-def _adcm(image, request, bind_container_ip, upgradable=False, https=False) -> Generator[ADCM, None, None]:
+def _adcm(image, request, bind_container_ip, postgres: Optional[PostgresInfo], upgradable=False, https=False) -> Generator[ADCM, None, None]:
     repo, tag = image
     cmd_opts = request.config.option
     labels = {"pytest_node_id": request.node.nodeid}
     # this option can be passed from private adcm-pytest-tools (check its README.md for more info)
     if hasattr(cmd_opts, "debug_owner") and cmd_opts.debug_owner:
         labels["debug_owner"] = cmd_opts.debug_owner
+
     docker_url = None
+
     if cmd_opts.remote_docker:
         docker_url = f"tcp://{cmd_opts.remote_docker}"
-        docker_wrapper = DockerWrapper(base_url=docker_url)
+        docker_wrapper = DockerWrapper(base_url=docker_url, postgres=postgres)
     else:
-        docker_wrapper = DockerWrapper()
-    volumes = {}
-    if upgradable:
-        volume_name = str(uuid.uuid4())[-12:]
-        volumes.update({volume_name: {"bind": "/adcm/shadow", "mode": "rw"}})
-    adcm = ADCM(
-        docker_wrapper=docker_wrapper,
-        container_config=ContainerConfig(
-            image=repo,
-            tag=tag,
-            pull=False,
-            bind_ip=bind_container_ip,
-            labels=labels,
-            volumes=volumes,
-            docker_url=docker_url,
-            https=https,
-        ),
+        docker_wrapper = DockerWrapper(postgres=postgres)
+
+    config = ContainerConfig(
+        image=repo,
+        tag=tag,
+        pull=False,
+        bind_ip=bind_container_ip,
+        labels=labels,
+        docker_url=docker_url,
+        volumes={},
+        https=https,
     )
+    
+    if postgres:
+        adcm = ADCMWithPostgres(docker_wrapper=docker_wrapper, container_config=config)
+    else:
+        if upgradable:
+            config.volumes[str(uuid.uuid4())[-12:]] = {"bind": "/adcm/shadow", "mode": "rw"}
+
+        adcm = ADCM(docker_wrapper=docker_wrapper, container_config=config)
 
     if request.config.option.dontstop:
         _print_adcm_url(request.config.pluginmanager.get_plugin("terminalreporter"), adcm)
@@ -336,7 +407,8 @@ def adcm_fs(
     Returns authorized instance of ADCM object
     """
     yield from _adcm(
-        image, request, upgradable=adcm_is_upgradable, https=adcm_https, bind_container_ip=bind_container_ip
+        image, request, postgres=request.getfixturevalue("postgres"),
+        upgradable=adcm_is_upgradable, https=adcm_https, bind_container_ip=bind_container_ip
     )
 
 
