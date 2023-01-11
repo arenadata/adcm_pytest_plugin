@@ -165,28 +165,36 @@ def postgres(
 ) -> Optional[PostgresInfo]:
     name = f"db-{random_string(6)}"
     user_init_script = Path(__file__).parent / "static" / "adcm-init-user-db.sh"
-    network = docker_client.networks.create(f"network-for-{name}")
-    container: Container = docker_client.containers.run(
-        image=postgres_image.id,
-        name=name,
-        environment={**postgres_variables},
-        volumes={
-            str(user_init_script.absolute()): {"bind": "/docker-entrypoint-initdb.d/init-user-db.sh", "mode": "ro"}
-        },
-        network=network.name,
-        # if ADCM container is alive, postgres container should be alive too
-        remove=adcm_initial_container_config.remove,
-        detach=True,
-    )
+    with allure.step("Prepare network"):
+        network = docker_client.networks.create(f"network-for-{name}", driver="host")
+    with allure.step("Launch container with Postgres"):
+        container: Container = docker_client.containers.run(
+            image=postgres_image.id,
+            name=name,
+            environment={**postgres_variables},
+            volumes={
+                str(user_init_script.absolute()): {"bind": "/docker-entrypoint-initdb.d/init-user-db.sh", "mode": "ro"}
+            },
+            network=network.name,
+            # if ADCM container is alive, postgres container should be alive too
+            remove=adcm_initial_container_config.remove,
+            detach=True,
+        )
     yield PostgresInfo(container=container, network=network)
-    container.stop()
-    network.remove()
+    with allure.step("Stop container and remove network"):
+        container.stop()
+        network.remove()
 
 
 # psql --username adcm --dbname adcm -c "\dt" | cat
 @pytest.fixture(scope="function")
 def db_cleanup(postgres):
     yield
+
+    if postgres.container.status != "running":
+        with allure.step("Skip postgres DB cleaning, because container isn't running"):
+            return
+
     with allure.step("Clean Postgres"):
         res = postgres.container.exec_run("psql --username adcm --dbname adcm -c '\\dt'")
         tables = tuple(
