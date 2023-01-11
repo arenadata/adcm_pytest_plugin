@@ -42,7 +42,9 @@ from .docker_utils import (
     gather_adcm_data_from_container,
     is_docker,
     remove_container_volumes,
-    remove_docker_image, ADCMWithPostgres, PostgresInfo,
+    remove_docker_image,
+    ADCMWithPostgres,
+    PostgresInfo,
 )
 from .utils import allure_reporter, check_mutually_exclusive, random_string, ADCM_PASS_KEY
 
@@ -178,7 +180,7 @@ def postgres(
     )
     yield PostgresInfo(container=container, network=network)
     container.stop()
-
+    network.remove()
 
 
 # psql --username adcm --dbname adcm -c "\dt" | cat
@@ -188,16 +190,24 @@ def db_cleanup(postgres):
     with allure.step("Clean Postgres"):
         res = postgres.container.exec_run("psql --username adcm --dbname adcm -c '\\dt'")
         tables = tuple(
-            # filter(lambda table: table.split("_")[0] in ("cm", "rbac", "audit"),
-            map(lambda line: line.split(" | ")[1].strip(),
-                filter(lambda line: "|" in line, res.output.decode().split("\n")[3:])))
-        # cleanup_result = postgres.container.exec_run(f"psql --username adcm --dbname adcm -c 'TRUNCATE {','.join(tables)};'")
+            # filter(lambda table: table.split("_")[0] in ("cm", "rbac", "audit", "auth", "authtoken"),
+            filter(
+                lambda table: table not in ("django_content_type", "django_migrations"),
+                map(
+                    lambda line: line.split(" | ")[1].strip(),
+                    filter(lambda line: "|" in line, res.output.decode().split("\n")[3:]),
+                ),
+            )
+        )
+        # TRUNCATE
         cleanup_result = postgres.container.exec_run(
-            f"psql --username adcm --dbname adcm -c 'DROP TABLE IF EXISTS {','.join(tables)} CASCADE;'")
-    ...
-    # with allure.step("Restart Postgres"):
-    #     postgres.container.stop()
-    #     postgres.container.start()
+            f"psql --username adcm --dbname adcm -c 'TRUNCATE {','.join(tables)} RESTART IDENTITY CASCADE;'"
+        )
+
+        # DROP TABLES
+        # cleanup_result = postgres.container.exec_run(
+        #     f"psql --username adcm --dbname adcm -c 'DROP TABLE IF EXISTS {','.join(tables)} CASCADE;'"
+        # )
 
 
 # pylint: disable=redefined-outer-name, too-many-arguments
@@ -252,7 +262,9 @@ def image(cmd_opts, adcm_api_credentials, additional_adcm_init_config, adcm_init
     remove_docker_image(**init_image, dc=docker_client)
 
 
-def _adcm(image, request, bind_container_ip, postgres: Optional[PostgresInfo], upgradable=False, https=False) -> Generator[ADCM, None, None]:
+def _adcm(
+    image, request, bind_container_ip, postgres: Optional[PostgresInfo], upgradable=False, https=False
+) -> Generator[ADCM, None, None]:
     repo, tag = image
     cmd_opts = request.config.option
     labels = {"pytest_node_id": request.node.nodeid}
@@ -278,7 +290,7 @@ def _adcm(image, request, bind_container_ip, postgres: Optional[PostgresInfo], u
         volumes={},
         https=https,
     )
-    
+
     if postgres:
         adcm = ADCMWithPostgres(docker_wrapper=docker_wrapper, container_config=config)
     else:
@@ -419,8 +431,12 @@ def adcm_fs(
     Returns authorized instance of ADCM object
     """
     yield from _adcm(
-        image, request, postgres=request.getfixturevalue("postgres"),
-        upgradable=adcm_is_upgradable, https=adcm_https, bind_container_ip=bind_container_ip
+        image,
+        request,
+        postgres=request.getfixturevalue("postgres"),
+        upgradable=adcm_is_upgradable,
+        https=adcm_https,
+        bind_container_ip=bind_container_ip,
     )
 
 
