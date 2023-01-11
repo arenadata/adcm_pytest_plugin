@@ -182,10 +182,22 @@ def postgres(
 
 
 # psql --username adcm --dbname adcm -c "\dt" | cat
-# @pytest.fixture(scope="function")
-# def db_cleanup(postgres):
-#     yield
-#     postgres.exec_run(["TRUNCATE"])
+@pytest.fixture(scope="function")
+def db_cleanup(postgres):
+    yield
+    with allure.step("Clean Postgres"):
+        res = postgres.container.exec_run("psql --username adcm --dbname adcm -c '\\dt'")
+        tables = tuple(
+            # filter(lambda table: table.split("_")[0] in ("cm", "rbac", "audit"),
+            map(lambda line: line.split(" | ")[1].strip(),
+                filter(lambda line: "|" in line, res.output.decode().split("\n")[3:])))
+        # cleanup_result = postgres.container.exec_run(f"psql --username adcm --dbname adcm -c 'TRUNCATE {','.join(tables)};'")
+        cleanup_result = postgres.container.exec_run(
+            f"psql --username adcm --dbname adcm -c 'DROP TABLE IF EXISTS {','.join(tables)} CASCADE;'")
+    ...
+    # with allure.step("Restart Postgres"):
+    #     postgres.container.stop()
+    #     postgres.container.start()
 
 
 # pylint: disable=redefined-outer-name, too-many-arguments
@@ -400,7 +412,7 @@ def adcm_ms(
 @allure.title("[FS] ADCM Container")
 @pytest.fixture(scope="function")
 def adcm_fs(
-    image, request, adcm_is_upgradable: bool, adcm_https: bool, bind_container_ip
+    image, request, adcm_is_upgradable: bool, adcm_https: bool, bind_container_ip, db_cleanup
 ) -> Generator[ADCM, None, None]:
     """Runs adcm container from the previously initialized image.
     Operates '--dontstop' option.
