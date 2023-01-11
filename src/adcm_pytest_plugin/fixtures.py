@@ -166,7 +166,7 @@ def postgres(
     name = f"db-{random_string(6)}"
     user_init_script = Path(__file__).parent / "static" / "adcm-init-user-db.sh"
     with allure.step("Prepare network"):
-        network = docker_client.networks.create(f"network-for-{name}", driver="host")
+        network = docker_client.networks.create(f"network-for-{name}")
     with allure.step("Launch container with Postgres"):
         container: Container = docker_client.containers.run(
             image=postgres_image.id,
@@ -191,9 +191,9 @@ def postgres(
 def db_cleanup(postgres):
     yield
 
-    if postgres.container.status != "running":
-        with allure.step("Skip postgres DB cleaning, because container isn't running"):
-            return
+    # if postgres.container.status != "running":
+    #     with allure.step("Skip postgres DB cleaning, because container isn't running"):
+    #         return
 
     with allure.step("Clean Postgres"):
         res = postgres.container.exec_run("psql --username adcm --dbname adcm -c '\\dt'")
