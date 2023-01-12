@@ -173,9 +173,9 @@ def postgres(
             image=postgres_image.id,
             name=name,
             environment={**postgres_variables},
-            volumes={
-                str(user_init_script.absolute()): {"bind": "/docker-entrypoint-initdb.d/init-user-db.sh", "mode": "ro"}
-            },
+            # volumes={
+            #     str(user_init_script.absolute()): {"bind": "/docker-entrypoint-initdb.d/init-user-db.sh", "mode": "ro"}
+            # },
             network="bridge",
             # network=network.name,
             # if ADCM container is alive, postgres container should be alive too
@@ -186,6 +186,46 @@ def postgres(
             name="container config",
             body=json.dumps(docker_client.api.inspect_container(container.id))
         )
+
+        time.sleep(5)
+
+        for statement in (
+            "CREATE USER adcm WITH ENCRYPTED PASSWORD 'password'",
+            "CREATE DATABASE adcm OWNER adcm",
+            "ALTER USER adcm CREATEDB"
+        ):
+            with allure.step(f"Run '{statement}' in Postgres container"):
+                result = container.exec_run(
+                    ["psql",
+                     "--username",
+                     "postgres",
+                     "--dbname",
+                     "postgres",
+                     "-c",
+                     statement]
+                )
+                if result.exit_code != 0:
+                    raise RuntimeError(f"Failed to execute statement:\n{result.output.decode()}")
+
+        # res = container.exec_run(["psql",
+        #                           "--username",
+        #                           "postgres",
+        #                           "--dbname",
+        #                           "postgres",
+        #                           "-c",
+        #                           "CREATE USER adcm WITH ENCRYPTED PASSWORD 'password'; CREATE DATABASE adcm OWNER adcm; ALTER USER adcm CREATEDB;"])
+        # command_1 = [
+        #     "psql",
+        #     "--username",
+        #     "postgres",
+        #     "--dbname",
+        #     "postgres",
+        #     "-c",
+        #     "CREATE USER adcm WITH ENCRYPTED PASSWORD 'password';"
+        # ]
+        #
+        # command_2 =     "CREATE DATABASE adcm OWNER adcm"
+        # command_3 = "ALTER USER adcm CREATEDB;"
     yield PostgresInfo(container=container, network=None)
     if not cmd_opts.dontstop:
         with allure.step("Stop container and remove network"):
