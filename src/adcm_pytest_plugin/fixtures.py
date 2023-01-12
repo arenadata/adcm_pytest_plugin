@@ -10,6 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Fixtures of ADCM image and ADCM client"""
+import json
 import socket
 import time
 import uuid
@@ -180,6 +181,10 @@ def postgres(
             # if ADCM container is alive, postgres container should be alive too
             remove=adcm_initial_container_config.remove,
             detach=True,
+        )
+        allure.attach(
+            name="container config",
+            body=json.dumps(docker_client.api.inspect_container(container.id))
         )
     yield PostgresInfo(container=container, network=None)
     with allure.step("Stop container and remove network"):

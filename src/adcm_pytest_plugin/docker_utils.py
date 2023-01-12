@@ -398,6 +398,10 @@ class DockerWrapper:  # pylint: disable=too-few-public-methods
                 name="Container config",
                 attachment_type=AttachmentType.JSON,
             )
+            allure.attach(
+                name="container config",
+                body=json.dumps(self.client.api.inspect_container(container.id))
+            )
             _wait_for_adcm_container_init(container, config.api_ip, config.api_port)
 
         return container, config
