@@ -433,7 +433,7 @@ def adcm_ms(
 @allure.title("[FS] ADCM Container")
 @pytest.fixture(scope="function")
 def adcm_fs(
-    image, request, adcm_is_upgradable: bool, adcm_https: bool, bind_container_ip, db_cleanup
+    image, request, adcm_is_upgradable: bool, adcm_https: bool, bind_container_ip, db_cleanup, postgres
 ) -> Generator[ADCM, None, None]:
     """Runs adcm container from the previously initialized image.
     Operates '--dontstop' option.
@@ -442,7 +442,7 @@ def adcm_fs(
     yield from _adcm(
         image,
         request,
-        postgres=request.getfixturevalue("postgres"),
+        postgres=postgres,
         upgradable=adcm_is_upgradable,
         https=adcm_https,
         bind_container_ip=bind_container_ip,
