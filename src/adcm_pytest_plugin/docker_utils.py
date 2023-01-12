@@ -317,7 +317,7 @@ def _wait_for_adcm_container_init(container, container_ip, port, timeout=300):
 
 class PostgresInfo(NamedTuple):
     container: Container
-    network: Network
+    network: Optional[Network]
 
 
 @dataclass
@@ -440,6 +440,7 @@ class DockerWrapper:  # pylint: disable=too-few-public-methods
                 labels=config.labels,
                 name=config.name,
                 detach=True,
+                network="bridge",
                 **kwargs,
             ),
             config.bind_port,
@@ -470,13 +471,15 @@ class DockerWrapper:  # pylint: disable=too-few-public-methods
         if not password_record:
             raise RuntimeError("Failed to get ADCM postgres password from postgres container")
 
+        postgres_ip = self.client.api.inspect_container(container.id)["NetworkSettings"]["IPAddress"]
+
         return {
-            "network": self.postgres.network.name,
+            # "network": self.postgres.network.name,
             "environment": [
                 password_record,
                 "DB_NAME=adcm",
                 "DB_USER=adcm",
-                f"DB_HOST={container.name}",
+                f"DB_HOST={postgres_ip}",
                 "DB_PORT=5432",
             ]
         }

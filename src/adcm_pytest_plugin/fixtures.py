@@ -165,8 +165,8 @@ def postgres(
 ) -> Optional[PostgresInfo]:
     name = f"db-{random_string(6)}"
     user_init_script = Path(__file__).parent / "static" / "adcm-init-user-db.sh"
-    with allure.step("Prepare network"):
-        network = docker_client.networks.create(f"network-for-{name}")
+    # with allure.step("Prepare network"):
+    #     network = docker_client.networks.create(f"network-for-{name}")
     with allure.step("Launch container with Postgres"):
         container: Container = docker_client.containers.run(
             image=postgres_image.id,
@@ -175,15 +175,16 @@ def postgres(
             volumes={
                 str(user_init_script.absolute()): {"bind": "/docker-entrypoint-initdb.d/init-user-db.sh", "mode": "ro"}
             },
-            network=network.name,
+            network="bridge",
+            # network=network.name,
             # if ADCM container is alive, postgres container should be alive too
             remove=adcm_initial_container_config.remove,
             detach=True,
         )
-    yield PostgresInfo(container=container, network=network)
+    yield PostgresInfo(container=container, network=None)
     with allure.step("Stop container and remove network"):
         container.stop()
-        network.remove()
+        # network.remove()
 
 
 # psql --username adcm --dbname adcm -c "\dt" | cat
