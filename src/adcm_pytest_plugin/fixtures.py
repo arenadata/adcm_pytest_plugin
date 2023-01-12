@@ -187,9 +187,10 @@ def postgres(
             body=json.dumps(docker_client.api.inspect_container(container.id))
         )
     yield PostgresInfo(container=container, network=None)
-    with allure.step("Stop container and remove network"):
-        container.stop()
-        # network.remove()
+    if not cmd_opts.dontstop:
+        with allure.step("Stop container and remove network"):
+            container.stop()
+            # network.remove()
 
 
 # psql --username adcm --dbname adcm -c "\dt" | cat
