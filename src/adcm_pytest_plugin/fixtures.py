@@ -162,7 +162,7 @@ def postgres_image(docker_client: DockerClient) -> Image:
 
 @pytest.fixture(scope="session")
 def postgres(
-    docker_client: DockerClient, postgres_image: Image, adcm_initial_container_config, postgres_variables: dict
+    cmd_opts, docker_client: DockerClient, postgres_image: Image, adcm_initial_container_config, postgres_variables: dict
 ) -> Optional[PostgresInfo]:
     name = f"db-{random_string(6)}"
     user_init_script = Path(__file__).parent / "static" / "adcm-init-user-db.sh"
