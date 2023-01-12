@@ -29,7 +29,6 @@ from docker.errors import ImageNotFound
 from docker.models.containers import Container
 from docker.models.images import Image
 from docker.models.networks import Network
-from docker.types import IPAMPool
 from docker.utils import parse_repository_tag
 from requests.exceptions import ReadTimeout as DockerReadTimeout
 
@@ -167,7 +166,7 @@ def postgres(
     name = f"db-{random_string(6)}"
     user_init_script = Path(__file__).parent / "static" / "adcm-init-user-db.sh"
     with allure.step("Prepare network"):
-        network = docker_client.networks.create(f"network-for-{name}", ipam=IPAMPool(subnet="172.18.0.0/24"))
+        network = docker_client.networks.create(f"network-for-{name}")
     with allure.step("Launch container with Postgres"):
         container: Container = docker_client.containers.run(
             image=postgres_image.id,
