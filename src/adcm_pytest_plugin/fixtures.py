@@ -194,9 +194,9 @@ def postgres(
 
     with allure.step("Prepare database"):
         for statement in (
-            "CREATE USER adcm WITH ENCRYPTED PASSWORD 'password'",
-            "CREATE DATABASE adcm OWNER adcm",
-            "ALTER USER adcm CREATEDB"
+            "CREATE USER adcm WITH ENCRYPTED PASSWORD 'password';",
+            "CREATE DATABASE adcm OWNER adcm;",
+            "ALTER USER adcm CREATEDB;"
         ):
             with allure.step(f"Run '{statement}' in Postgres container"):
                 result = container.exec_run(
@@ -252,10 +252,10 @@ def db_cleanup(postgres):
         tables = tuple(
             # filter(lambda table: table.split("_")[0] in ("cm", "rbac", "audit", "auth", "authtoken"),
             filter(
-                lambda table: table not in ("django_content_type", "django_migrations"),
+                lambda table: table not in ("django_content_type", "django_migrations", "cm_messagetemplate"),
                 map(
                     lambda line: line.split(" | ")[1].strip(),
-                    filter(lambda line: "|" in line, res.output.decode().split("\n")[3:]),
+                    filter(lambda line: "|" in line, res.output.decode().splitlines()[3:]),
                 ),
             )
         )
