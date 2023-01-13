@@ -146,6 +146,7 @@ def postgres_variables() -> dict:
     }
 
 
+@allure.step("Prepare postgres image")
 @pytest.fixture(scope="session")
 def postgres_image(docker_client: DockerClient) -> Image:
     # TODO add customization
@@ -160,6 +161,7 @@ def postgres_image(docker_client: DockerClient) -> Image:
     return image
 
 
+@allure.title("Run PostgreSQL container")
 @pytest.fixture(scope="session")
 def postgres(
     cmd_opts, docker_client: DockerClient, postgres_image: Image, adcm_initial_container_config, postgres_variables: dict
@@ -182,13 +184,15 @@ def postgres(
             remove=adcm_initial_container_config.remove,
             detach=True,
         )
-        allure.attach(
-            name="container config",
-            body=json.dumps(docker_client.api.inspect_container(container.id))
-        )
+        # allure.attach(
+        #         #     name="container config",
+        #         #     body=json.dumps(docker_client.api.inspect_container(container.id))
+        #         # )
 
+    with allure.step("Wait until container is started properly"):
         time.sleep(5)
 
+    with allure.step("Prepare database"):
         for statement in (
             "CREATE USER adcm WITH ENCRYPTED PASSWORD 'password'",
             "CREATE DATABASE adcm OWNER adcm",
@@ -234,6 +238,7 @@ def postgres(
 
 
 # psql --username adcm --dbname adcm -c "\dt" | cat
+@allure.title("[FS] DB Cleanup")
 @pytest.fixture(scope="function")
 def db_cleanup(postgres):
     yield
@@ -242,7 +247,7 @@ def db_cleanup(postgres):
     #     with allure.step("Skip postgres DB cleaning, because container isn't running"):
     #         return
 
-    with allure.step("Clean Postgres"):
+    with allure.step("Get a list of tables to delete"):
         res = postgres.container.exec_run("psql --username adcm --dbname adcm -c '\\dt'")
         tables = tuple(
             # filter(lambda table: table.split("_")[0] in ("cm", "rbac", "audit", "auth", "authtoken"),
@@ -254,6 +259,7 @@ def db_cleanup(postgres):
                 ),
             )
         )
+    with allure.step("Clean tables"):
         # TRUNCATE
         cleanup_result = postgres.container.exec_run(
             f"psql --username adcm --dbname adcm -c 'TRUNCATE {','.join(tables)} RESTART IDENTITY CASCADE;'"
