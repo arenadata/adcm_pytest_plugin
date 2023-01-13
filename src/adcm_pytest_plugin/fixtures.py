@@ -252,7 +252,7 @@ def db_cleanup(postgres):
         tables = tuple(
             # filter(lambda table: table.split("_")[0] in ("cm", "rbac", "audit", "auth", "authtoken"),
             filter(
-                lambda table: table not in ("django_content_type", "django_migrations", "cm_messagetemplate"),
+                lambda table: True,# table not in ("django_content_type", "django_migrations", "cm_messagetemplate"),
                 map(
                     lambda line: line.split(" | ")[1].strip(),
                     filter(lambda line: "|" in line, res.output.decode().splitlines()[3:]),
@@ -261,14 +261,14 @@ def db_cleanup(postgres):
         )
     with allure.step("Clean tables"):
         # TRUNCATE
-        cleanup_result = postgres.container.exec_run(
-            f"psql --username adcm --dbname adcm -c 'TRUNCATE {','.join(tables)} RESTART IDENTITY CASCADE;'"
-        )
+        # cleanup_result = postgres.container.exec_run(
+        #     f"psql --username adcm --dbname adcm -c 'TRUNCATE {','.join(tables)} RESTART IDENTITY CASCADE;'"
+        # )
 
         # DROP TABLES
-        # cleanup_result = postgres.container.exec_run(
-        #     f"psql --username adcm --dbname adcm -c 'DROP TABLE IF EXISTS {','.join(tables)} CASCADE;'"
-        # )
+        cleanup_result = postgres.container.exec_run(
+            f"psql --username adcm --dbname adcm -c 'DROP TABLE IF EXISTS {','.join(tables)} CASCADE;'"
+        )
 
 
 # pylint: disable=redefined-outer-name, too-many-arguments
