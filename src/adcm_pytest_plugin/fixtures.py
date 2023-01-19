@@ -39,8 +39,11 @@ from adcm_pytest_plugin.docker.steps import (
     get_http_and_https_ports,
     get_only_http_port,
 )
-from adcm_pytest_plugin.docker.utils import adcm_image_version_support_postgres, is_docker
+from adcm_pytest_plugin.docker.utils import is_docker
 from adcm_pytest_plugin.utils import allure_reporter, check_mutually_exclusive
+
+
+# pylint: disable=redefined-outer-name
 
 
 @pytest.fixture(scope="session")
@@ -54,7 +57,7 @@ def docker_client(cmd_opts) -> DockerClient:
 # pylint: disable=redefined-outer-name
 @allure.title("Bind container IP")
 @pytest.fixture(scope="session")
-def bind_container_ip(cmd_opts, docker_client) -> str:
+def bind_container_ip(cmd_opts) -> str:
     """Get ip binding to container"""
     if cmd_opts.remote_docker:
         return cmd_opts.remote_docker.split(":")[0]
@@ -113,20 +116,19 @@ def adcm_image(cmd_opts, adcm_image_name, docker_client) -> Image:
         with allure.step(f"Get ADCM {image} from local repo"):
             return docker_client.images.get(name=image)
 
-    # TODO staticimage?
-
     with allure.step(f"Pull ADCM {tag} from repository {repo}"):
         return docker_client.images.pull(repository=repo, tag=tag)
 
 
 @allure.title("Pick ADCM implementation")
 @pytest.fixture(scope="session")
-def launcher_class(adcm_image_name, docker_client, cmd_opts) -> Type[ADCMLauncher]:
+def launcher_class(adcm_image_name) -> Type[ADCMLauncher]:
     """
     Decide what ADCM launcher to use
     """
     _, tag = adcm_image_name
-    return ADCMWithPostgresLauncher if adcm_image_version_support_postgres(tag) else ADCMLauncher
+    # TODO implement
+    return ADCMWithPostgresLauncher if tag else ADCMLauncher
 
 
 @allure.title("Prepare lifecycle stages")
@@ -145,6 +147,7 @@ def stages(cmd_opts, adcm_https, launcher_class, adcm_is_upgradable):
 
     if adcm_https:
         prepare_image_steps.append(generate_ssl_certificate_for_adcm)
+        # prepare_run_arguments_steps.append(mount_ssl_certs)
         prepare_run_arguments_steps.append(get_http_and_https_ports)
         on_cleanup_steps.append(cleanup_ssl_certificate_directory)
     else:
@@ -155,9 +158,10 @@ def stages(cmd_opts, adcm_https, launcher_class, adcm_is_upgradable):
         pre_stop_steps += [attach_postgres_data_dir, cleanup_via_truncate]
     else:
         if adcm_is_upgradable:
-            # TODO this upgrade is not like the one recommended
             prepare_run_arguments_steps.append(
-                lambda _1, _2: {"volumes": {[str(uuid.uuid4())[-12:]]: {"bind": "/adcm/shadow", "mode": "rw"}}}
+                lambda _1, d: {
+                    "volumes": {**d.get("volumes", {}), str(uuid.uuid4())[-12:]: {"bind": "/adcm/data", "mode": "rw"}}
+                }
             )
 
     return Stages(
@@ -171,7 +175,7 @@ def stages(cmd_opts, adcm_https, launcher_class, adcm_is_upgradable):
 @allure.title("Initiate launcher")
 @pytest.fixture(scope="session")
 def container_launcher(
-    adcm_image: Image, adcm_image_name: Tuple[str, str], docker_client, bind_container_ip, launcher_class, stages
+    adcm_image_name: Tuple[str, str], docker_client, bind_container_ip, launcher_class, stages
 ) -> Generator[ADCMLauncher, None, None]:
     launcher = launcher_class(
         adcm_image=adcm_image_name, docker_client=docker_client, bind_ip=bind_container_ip, stages=stages
@@ -188,12 +192,10 @@ def image(cmd_opts, container_launcher) -> Tuple[str, str]:
 
     yield tuple(container_launcher.image_name.split(":"))
 
-    if cmd_opts.dontstop or cmd_opts.staticimage:
+    if cmd_opts.dontstop:
         return
 
     container_launcher.cleanup()
-    # TODO add this to the cleanup
-    # remove_docker_image(**init_image, dc=docker_client)
 
 
 def _adcm(request, launcher: ADCMLauncher):
@@ -349,7 +351,6 @@ def cmd_opts(request):
     cmd_opts = request.config.option
     mutually_exclusive_opts = [
         ["adcm_image", "adcm_images", "adcm_min_version"],
-        ["staticimage", "adcm_images", "adcm_min_version"],
     ]
     # if more than one option that defines image params is used raise exception
     # pytest don't allow more convenient mechanisms to add mutually exclusive options.

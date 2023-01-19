@@ -55,29 +55,6 @@ def test_fixture_sdk_client(testdir):
     run_tests(testdir, "test_sdk_client.py")
 
 
-def test_fixture_image_staticimage(testdir):
-    """Test image creating by fixture from plugin with 'staticimage' cmd opt"""
-    custom_image_name = "test_repo/test_image:test_tag"
-    create_image_py_file = """
-    def test_create_image(image):
-        pass
-    """
-    run_tests(
-        testdir,
-        makepyfile_str=create_image_py_file,
-        additional_opts=[f"--staticimage={custom_image_name}"],
-    )
-
-    client = docker.from_env()
-    assert len(client.images.list(name=custom_image_name)) == 1, f"Do not found image with '{custom_image_name}' name"
-
-    # Remove created static image after test
-    for container in client.containers.list(filters=dict(ancestor=custom_image_name)):
-        with suppress_docker_wait_error():
-            container.wait(condition="removed", timeout=30)
-    client.images.remove(custom_image_name, force=True)
-
-
 def test_fixture_adcm_dontstop(testdir):
     """Test ADCM running by fixture from plugin with 'dontstop' cmd opt"""
     run_adcm_py_file = """

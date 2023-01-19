@@ -62,17 +62,6 @@ def pytest_addoption(parser):
     """Add plugin CLI options"""
 
     parser.addoption(
-        "--staticimage",
-        action="store",
-        default=None,
-        help="Use pre-initialised ADCM image. "
-        "If image doesn't exist then it will be created ones "
-        "and can be reused in future test runs. "
-        "Useful for tests development. You will save about 40 second on ADCM initialisation "
-        "Ex: arenadata/adcm:test or some_repo/some_image:some_tag",
-    )
-
-    parser.addoption(
         "--dontstop",
         action="store_true",
         default=False,
@@ -194,7 +183,9 @@ def _get_adcm_tags() -> List[str]:
     adapter = HTTPAdapter(max_retries=Retry())
     http = requests.Session()
     http.mount("https://", adapter)
-    artifacts_data = http.get("https://hub.arenadata.io/api/v2.0/projects/adcm/repositories/adcm/artifacts").json()
+    artifacts_data = http.get(
+        "https://hub.arenadata.io/api/v2.0/projects/adcm/repositories/adcm/artifacts", timeout=30
+    ).json()
     return list(itertools.chain.from_iterable([tag["name"] for tag in artifact["tags"]] for artifact in artifacts_data))
 
 

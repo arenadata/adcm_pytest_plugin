@@ -6,10 +6,10 @@ from os import system
 from warnings import warn
 
 import requests
-from docker.errors import NotFound
+from docker.errors import NotFound, APIError
 from docker.models.containers import ExecResult, Container
 
-from adcm_pytest_plugin.utils import random_string
+from adcm_pytest_plugin.utils import random_string, retry_on_error
 
 
 def _run_command_and_assert_result(command: str, fail_message: str):
@@ -30,12 +30,6 @@ def is_docker() -> bool:
     except FileNotFoundError:
         pass
     return False
-
-
-def adcm_image_version_support_postgres(image_tag: str) -> bool:
-    # TODO implement
-    #   maybe we can't even figure out is this postgres-based image or not only by version
-    return True
 
 
 def get_successful_output(exec_run_result: ExecResult) -> str:
@@ -71,11 +65,14 @@ def get_file_from_container(instance, path, filename):
 
 
 def remove_container_volumes(container: Container):
-    """Remove volumes related to the given container.
-    Note that container should be removed before function call."""
-    for name in [mount["Name"] for mount in container.attrs["Mounts"] if mount["Type"] == "volume"]:
-        with suppress(NotFound):  # volume may be removed already
-            container.client.volumes.get(name).remove()
+    """
+    Remove volumes related to the given container.
+    Note that container should be removed before function call.
+    """
+
+    for name in (mount["Name"] for mount in container.attrs["Mounts"] if mount["Type"] == "volume"):
+        with suppress(NotFound):
+            retry_on_error(container.client.volumes.get(name).remove, err_to_ignore_=APIError, err_to_reraise_=NotFound)
 
 
 @contextmanager
@@ -111,3 +108,7 @@ def copy_file_to_container(from_container: Container, to_container: Container, f
     _run_command_and_assert_result(
         f"docker cp /tmp/{local_tempdir} {to_container.name}:{to_path}", "Copy to container failed."
     )
+
+
+def get_network_settings(container: Container) -> dict:
+    return container.client.api.inspect_container(container.id)["NetworkSettings"]

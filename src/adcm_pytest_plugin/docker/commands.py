@@ -122,7 +122,7 @@ def _get_command_prefixes(adcm: ADCM) -> Tuple[str, str]:
 
 
 def _get_adcm_version(adcm: ADCM) -> str:
-    response = requests.get(f"{adcm.url}/api/v1/info/")
+    response = requests.get(f"{adcm.url}/api/v1/info/", timeout=5)
     response.raise_for_status()
     return response.json()["adcm_version"]
 

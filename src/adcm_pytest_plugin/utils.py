@@ -19,7 +19,7 @@ import string
 from contextlib import AbstractContextManager
 from inspect import getfullargspec
 from time import sleep, time
-from typing import Callable, Iterable, List, Optional, Tuple, Type, Union, Collection
+from typing import Callable, Iterable, List, Optional, Tuple, Type, Union, TypeVar
 
 import allure
 import pytest
@@ -393,10 +393,10 @@ def wait_until_step_succeeds(func, timeout: Union[int, float] = 300, period: Uni
                 last_error = err
                 sleep(period)
                 continue
-        else:
-            raise AssertionError(
-                f'Step "{func.__name__}" failed after retrying {timeout} seconds. ' f"The last error was: {last_error}"
-            )
+
+        raise AssertionError(
+            f'Step "{func.__name__}" failed after retrying {timeout} seconds. ' f"The last error was: {last_error}"
+        )
 
 
 class catch_failed(AbstractContextManager):  # pylint: disable=invalid-name
@@ -510,3 +510,36 @@ def retry(
     message = err_message_ if not callable(err_message_) else err_message_()
 
     raise err_type_(f"{message}\nAttempts: {attempts_}\nWait between attempts: {wait_between_}")
+
+
+ReturnValue = TypeVar("ReturnValue")
+
+
+def retry_on_error(
+    func: Callable[..., ReturnValue],
+    *args,
+    attempts_: int = 5,
+    wait_between_: float = 1.0,
+    err_to_ignore_: Union[Type[Exception], Tuple[Type[Exception], ...]] = Exception,
+    err_to_reraise_: Optional[Type[Exception]] = None,
+    err_type_: Type[Exception] = AssertionError,
+    err_message_: Union[str, Callable[[], str]] = "Failed to execute step",
+    **kwargs,
+) -> ReturnValue:
+    last_error = None
+    for i in range(attempts_):
+        try:
+            return func(*args, **kwargs)
+        except err_to_ignore_ as err:  # pylint: disable=broad-except
+            if err_to_reraise_ and isinstance(err, err_to_reraise_):
+                raise err
+
+            last_error = err
+            if i < attempts_ - 1:
+                sleep(wait_between_)
+
+    message = err_message_ if not callable(err_message_) else err_message_()
+
+    raise err_type_(
+        f"{message}\nLast error was: {last_error}\nAttempts: {attempts_}\nWait between attempts: {wait_between_}"
+    ) from last_error

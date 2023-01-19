@@ -1,19 +1,20 @@
 from contextlib import suppress, contextmanager
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from time import sleep
 from typing import Tuple, Callable, Collection, Optional, Any
-from warnings import warn
 
 import allure
+import requests
 from _pytest.fixtures import SubRequest
-from adcm_client.util.wait import wait_for_url
 from docker import DockerClient
-from docker.errors import APIError
+from docker.errors import APIError, ImageNotFound
 from docker.models.containers import Container
-from requests import ReadTimeout
+from requests import ReadTimeout, RequestException
 
 from adcm_pytest_plugin.docker.adcm import ADCM, ADCMWithPostgres
 from adcm_pytest_plugin.docker.postgresql import PostgreSQL
-from adcm_pytest_plugin.docker.utils import remove_container_volumes
+from adcm_pytest_plugin.docker.utils import remove_container_volumes, suppress_docker_wait_error, get_network_settings
 from adcm_pytest_plugin.utils import random_string, retry
 
 CONTAINER_START_RETRY_COUNT = 20
@@ -23,7 +24,7 @@ CONTAINER_START_RETRY_COUNT = 20
 def _add_step_on_error():
     try:
         yield
-    except Exception as err:
+    except Exception as err:  # pylint: disable=broad-except
         with allure.step(f"[ERROR] {err}"):
             ...
 
@@ -37,12 +38,11 @@ class Stages:
     prepare_image: Collection[Callable] = ()
     # second argument is the current step value of kwargs dict
     prepare_run_arguments: Collection[Callable[["ADCMLauncher", dict], dict]] = ()
-    after_run: Collection[Callable[["ADCMLauncher"], None]] = ()
     pre_stop: Collection[Callable[["ADCMLauncher", SubRequest], None]] = ()
     on_cleanup: Collection[Callable[["ADCMLauncher"], None]] = ()
 
 
-class ADCMLauncher:
+class ADCMLauncher:  # pylint: disable=too-many-instance-attributes
 
     _adcm_class = ADCM
     _local_repository = "local/adcminit"
@@ -68,8 +68,10 @@ class ADCMLauncher:
             for step in self._stages.prepare_run_arguments:
                 kwargs.update(step(self, {**kwargs}))
 
+            final_kwargs = kwargs_mutator(kwargs)
+            self.add_step_fact("last-launch-kwargs", {**final_kwargs})
             try:
-                return self._docker.containers.run(image=self.image_name, detach=True, **kwargs_mutator({**kwargs}))
+                return self._docker.containers.run(image=self.image_name, detach=True, **final_kwargs)
             except APIError as err:
                 if (
                     "failed: port is already allocated" in err.explanation
@@ -77,22 +79,37 @@ class ADCMLauncher:
                     or "bind: cannot assign requested address" in err.explanation  # noqa: W503
                 ):
                     continue
-                else:
-                    raise err
+                raise err
 
         raise RetryCountExceeded(f"Unable to start container after {CONTAINER_START_RETRY_COUNT} retries")
 
     def _wait_adcm_container_init(self) -> None:
         timeout = 300
+        period = 1
         url = f"{self.adcm.url}/api/v1/"
+        last_error = None
         with allure.step(f"Waiting for ADCM API on {url}"):
-            if not wait_for_url(url, timeout):
-                additional_message = ""
+            stop_after = datetime.utcnow() + timedelta(seconds=timeout)
+            while datetime.utcnow() < stop_after:
                 try:
-                    self.adcm.container.kill()
-                except APIError:
-                    additional_message = "\nWARNING: Failed to kill docker container. Try to remove it by hand"
-                raise TimeoutError(f"ADCM API has not responded in {timeout} seconds{additional_message}")
+                    if requests.get(url, timeout=1, verify=False).status_code == 200:
+                        return
+                except RequestException as err:
+                    last_error = err
+                sleep(period)
+
+            # if we're here it's a failure
+            additional_message = ""
+
+            if last_error:
+                additional_message += f"\nLast error was: {last_error}"
+
+            try:
+                self.adcm.container.kill()
+            except APIError:
+                additional_message += "\nWARNING: Failed to kill docker container. Try to remove it by hand"
+
+            raise TimeoutError(f"ADCM API has not responded in {timeout} seconds.{additional_message}")
 
     @allure.step("Prepare ADCM")
     def prepare(self):
@@ -100,7 +117,7 @@ class ADCMLauncher:
             return
 
         container = self._run_adcm_container()
-        self.adcm = self._adcm_class(container, ip=self.bind_ip, https=False)
+        self.adcm = self._adcm_class(container, ip=self.bind_ip)
         self._wait_adcm_container_init()
 
         for step in self._stages.prepare_image:
@@ -118,12 +135,35 @@ class ADCMLauncher:
     @allure.step("Run ADCM")
     def run(self, *, run_arguments_mutator: Callable[[dict], dict] = lambda x: x):
         container = self._run_adcm_container(run_arguments_mutator)
-        is_https = "8443/tcp" in container.ports
-        self.adcm = self._adcm_class(container, ip=self.bind_ip, https=is_https)
+        self.adcm = self._adcm_class(container, ip=self.bind_ip)
         self._wait_adcm_container_init()
 
-        for step in self._stages.after_run:
-            step(self)
+    def upgrade(self, target: Tuple[str, str]) -> ADCM:
+        container_info = self._docker.api.inspect_container(self.adcm.container.id)
+
+        suitable_volume = next(filter(lambda m: m["Destination"] == "/adcm/data", container_info["Mounts"]), None)
+        if not suitable_volume:
+            raise RuntimeError(
+                "There is no volume to move data. Make sure you are using the correct ADCM fixture for upgrade\n"
+                f"Mounts: {container_info['Mounts']}"
+            )
+
+        volume_name = suitable_volume.get("Name")
+        if not volume_name:
+            raise RuntimeError("Can't upgrade when volume has no name")
+
+        previous_run_kwargs = self.get_step_fact("last-launch-kwargs")
+        if not previous_run_kwargs:
+            raise RuntimeError("It looks like ADCM wasn't launched via `run`, so we can't detect launch kwargs")
+
+        self.adcm.container.stop()
+
+        image, tag = target
+        # if image was prepared
+        # this will lead to not deleted trash on cleanup image removal
+        self.image_name = f"{image}:{tag}"
+        self.run(run_arguments_mutator=lambda _: {**previous_run_kwargs})
+        return self.adcm
 
     @allure.step("Stop ADCM")
     def stop(self, request: SubRequest):
@@ -144,10 +184,16 @@ class ADCMLauncher:
                 with allure.step(f'Running "{step.__name__}"'):
                     step(self)
 
-    def add_step_fact(self, key: str, value: Any) -> None:
-        if key in self._stages_info:
-            warn(f"Fact by key '{key}' is already presented in stages info dict, it'll be rewritten")
+        if self._local_repository in self.image_name:
+            with allure.step("Remove prepared ADCM image"):
+                for container in self._docker.containers.list(filters={"ancestor": self.image_name}):
+                    with suppress_docker_wait_error():
+                        container.wait(condition="removed", timeout=30)
 
+                with suppress(ImageNotFound):
+                    retry(self._docker.images.remove, self.image_name, force=True, wait_between_=2.0)
+
+    def add_step_fact(self, key: str, value: Any) -> None:
         self._stages_info[key] = value
 
     def get_step_fact(self, key: str) -> Optional[Any]:
@@ -163,7 +209,6 @@ class ADCMWithPostgresLauncher(ADCMLauncher):
         self.postgres: Optional[PostgreSQL] = None
 
     def _run_postgres(self):
-        # TODO add customization ??
         repo, tag = "postgres", "latest"
 
         postgres_image = self._docker.images.pull(repository=repo, tag=tag)
@@ -215,7 +260,7 @@ class ADCMWithPostgresLauncher(ADCMLauncher):
         return container
 
     def _prepare_default_kwargs(self) -> dict:
-        postgres_ip = self._docker.api.inspect_container(self.postgres.container.id)["NetworkSettings"]["IPAddress"]
+        postgres_ip = get_network_settings(self.postgres.container)["IPAddress"]
         return {
             **super()._prepare_default_kwargs(),
             "network": "bridge",

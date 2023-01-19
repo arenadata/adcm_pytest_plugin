@@ -67,6 +67,12 @@ def get_http_and_https_ports(launcher: ADCMLauncher, *_a, **_kw) -> dict:
     return {"ports": {"8000": (ip, next(ports)), "8443": (ip, next(ports))}}
 
 
+def mount_ssl_certs(launcher: ADCMLauncher, run_args, *_a, **_kw) -> dict:
+    volumes = run_args.get("volumes", {})
+    cert_dir: TemporaryDirectory = launcher.get_step_fact("ssl-certs-directory")
+    return {"volumes": {**volumes, cert_dir.name: {"bind": "/adcm/data/conf/ssl", "mode": "ro"}}}
+
+
 def generate_ssl_certificate_for_adcm(launcher: ADCMLauncher, *_a, **_kw):
     tempdir = TemporaryDirectory()  # pylint: disable=consider-using-with
     launcher.add_step_fact("ssl-certs-directory", tempdir)  # for cleanup
@@ -146,6 +152,8 @@ def attach_adcm_data_dir(launcher: ADCMLauncher, request: SubRequest, *_a, **_kw
         attach_method(body=data, **attach_kwargs)
 
 
+# TODO maybe we want to make a backup?
+#   Archive is simple, but it's getting bigger with each test
 def attach_postgres_data_dir(launcher: ADCMWithPostgresLauncher, request: SubRequest, *_a, **_kw):
     if not _collection_required(request):
         return
