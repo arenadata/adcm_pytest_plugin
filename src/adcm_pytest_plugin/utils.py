@@ -19,18 +19,17 @@ import string
 from contextlib import AbstractContextManager
 from inspect import getfullargspec
 from time import sleep, time
-from typing import Callable, Iterable, List, Optional, Tuple, Type, Union, TypeVar
+from typing import Callable, Iterable, List, Optional, Tuple, Type, TypeVar, Union
 
 import allure
 import pytest
-from _pytest.fixtures import FixtureFunctionMarker, FixtureFunction
+from _pytest.fixtures import FixtureFunction, FixtureFunctionMarker
 from _pytest.mark import MarkDecorator
 from adcm_client.base import ObjectNotFound
 from adcm_client.objects import Cluster, Host, Task
 from allure_commons.reporter import AllureReporter
 from allure_pytest.listener import AllureListener
 from decorator import decorator
-
 
 # key to use for setting postgres password via env variables in ADCM and Postgres containers
 # stored here to avoid circular imports

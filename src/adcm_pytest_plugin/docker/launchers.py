@@ -1,8 +1,8 @@
-from contextlib import suppress, contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from time import sleep
-from typing import Tuple, Callable, Collection, Optional, Any
+from typing import Any, Callable, Collection, Optional, Tuple
 
 import allure
 import requests
@@ -14,7 +14,7 @@ from requests import ReadTimeout, RequestException
 
 from adcm_pytest_plugin.docker.adcm import ADCM, ADCMWithPostgres
 from adcm_pytest_plugin.docker.postgresql import PostgreSQL
-from adcm_pytest_plugin.docker.utils import remove_container_volumes, suppress_docker_wait_error, get_network_settings
+from adcm_pytest_plugin.docker.utils import get_network_settings, remove_container_volumes, suppress_docker_wait_error
 from adcm_pytest_plugin.utils import random_string, retry
 
 CONTAINER_START_RETRY_COUNT = 20

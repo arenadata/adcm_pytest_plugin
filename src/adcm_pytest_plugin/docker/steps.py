@@ -3,12 +3,13 @@ import string
 import tarfile
 import time
 from collections.abc import Iterator
-from contextlib import suppress, contextmanager
+from contextlib import contextmanager, suppress
+from functools import partial
 from gzip import compress
 from io import BytesIO
-from socket import AF_INET, socket, SOCK_STREAM
+from socket import AF_INET, SOCK_STREAM, socket
 from tempfile import TemporaryDirectory
-from typing import Generator, Tuple, Callable
+from typing import Callable, Generator, Tuple
 from uuid import uuid4
 
 import allure
@@ -16,7 +17,8 @@ import pytest
 from _pytest.fixtures import SubRequest
 from docker.models.containers import Container
 
-from adcm_pytest_plugin.docker.launchers import ADCMWithPostgresLauncher, ADCMLauncher
+from adcm_pytest_plugin.docker.commands import dumpdata
+from adcm_pytest_plugin.docker.launchers import ADCMLauncher, ADCMWithPostgresLauncher
 from adcm_pytest_plugin.docker.utils import get_successful_output
 from adcm_pytest_plugin.utils import allure_reporter
 
@@ -152,16 +154,21 @@ def attach_adcm_data_dir(launcher: ADCMLauncher, request: SubRequest, *_a, **_kw
         attach_method(body=data, **attach_kwargs)
 
 
-# TODO maybe we want to make a backup?
-#   Archive is simple, but it's getting bigger with each test
 def attach_postgres_data_dir(launcher: ADCMWithPostgresLauncher, request: SubRequest, *_a, **_kw):
     if not _collection_required(request):
         return
 
-    filename = f"Postgres /var/lib/postgresql/data {request.node.name}_{time.time()}.tgz"
-    attach_method, attach_kwargs = _prepare_attach(request, filename)
-    with get_directory_from_container(launcher.postgres.container, "/var/lib/postgresql/data/") as data:
-        attach_method(body=data, **attach_kwargs)
+    dump_file = "/adcm/data/dump.json"
+    dumpdata(launcher.adcm, dump_file)
+    dump_content = get_successful_output(launcher.adcm.container.exec_run(["cat", dump_file]))[0]
+
+    reporter = allure_reporter(request.config)
+    attach_method = (
+        partial(reporter.attach_data, uuid=uuid4(), parent_uuid=reporter.get_test(uuid=None).uuid)
+        if reporter
+        else allure.attach
+    )
+    attach_method(name="ADCM dumped data", body=dump_content, attachment_type=allure.attachment_type.JSON)
 
 
 # CLEANUP

@@ -2,8 +2,8 @@ from typing import Optional
 
 from docker.models.containers import Container
 
-from adcm_pytest_plugin.docker.utils import is_docker, get_network_settings
 from adcm_pytest_plugin.constants import DEFAULT_IP
+from adcm_pytest_plugin.docker.utils import get_network_settings, is_docker
 
 
 class ADCM:

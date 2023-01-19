@@ -20,7 +20,15 @@ Example:
     ...
 """
 
+from typing import NamedTuple
+
 import pytest
+
+
+class ADCMVersionParam(NamedTuple):
+    repository: str
+    tag: str
+    with_postgres: bool
 
 
 including_https = pytest.mark.parametrize(

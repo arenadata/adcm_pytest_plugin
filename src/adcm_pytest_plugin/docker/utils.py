@@ -1,13 +1,13 @@
 import re
 import tarfile
-from contextlib import suppress, contextmanager
+from contextlib import contextmanager, suppress
 from io import BytesIO
 from os import system
 from warnings import warn
 
 import requests
-from docker.errors import NotFound, APIError
-from docker.models.containers import ExecResult, Container
+from docker.errors import APIError, NotFound
+from docker.models.containers import Container, ExecResult
 
 from adcm_pytest_plugin.utils import random_string, retry_on_error
 

@@ -178,3 +178,10 @@ def clearaudit(adcm: ADCM) -> None:
     Run audit log cleanup with "clearaudit" command
     """
     _run_command(adcm, "clearaudit")
+
+
+def dumpdata(adcm: ADCM, filename: str) -> None:
+    """
+    Dump ADCM DB data to a given file
+    """
+    _run_command(adcm, "dumpdata", [">", filename])
