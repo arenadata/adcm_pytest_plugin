@@ -21,7 +21,6 @@ import allure
 import docker
 import pytest
 from requests.exceptions import ReadTimeout as DockerReadTimeout
-from adcm_pytest_plugin.docker.utils import suppress_docker_wait_error
 
 from tests.plugin.common import run_tests
 

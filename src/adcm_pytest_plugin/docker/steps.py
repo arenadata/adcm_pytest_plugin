@@ -2,14 +2,13 @@ import os
 import string
 import tarfile
 import time
-from collections.abc import Iterator
 from contextlib import contextmanager, suppress
 from functools import partial
 from gzip import compress
 from io import BytesIO
 from socket import AF_INET, SOCK_STREAM, socket
 from tempfile import TemporaryDirectory
-from typing import Callable, Generator, Tuple
+from typing import Callable, Generator, Tuple, Iterator
 from uuid import uuid4
 
 import allure
