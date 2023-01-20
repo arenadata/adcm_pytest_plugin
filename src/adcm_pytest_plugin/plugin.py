@@ -30,6 +30,7 @@ from urllib3 import Retry
 from version_utils import rpm
 
 from .fixtures import *  # noqa: F401, F403
+from .fixtures import ADCMVersionParam
 from .objects.actions import ActionRunInfo, ActionsRunReport, ActionsSpec
 from .params import *  # noqa: F401, F403
 from .utils import allure_reporter, func_name_to_title
