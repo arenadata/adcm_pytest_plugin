@@ -251,11 +251,9 @@ class ADCMWithPostgresLauncher(ADCMLauncher):
 
         query = "CREATE USER adcm WITH ENCRYPTED PASSWORD 'password';"
         with allure.step(f'Try to create database with query "{query}"'):
+            command = ["psql", "--username", "postgres", "--dbname", "postgres", "-c", query]
             retry(
-                lambda: container.exec_run(
-                    ["psql", "--username", "postgres", "--dbname", "postgres", "-c", query]
-                ).exit_code
-                == 0,
+                lambda: container.exec_run(command).exit_code == 0,
                 err_message_="Failed to create database",
                 wait_between_=1,
                 **wait_kwargs,
