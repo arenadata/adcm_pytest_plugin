@@ -20,10 +20,21 @@ Example:
     def test_some():
     ...
 """
-
+from dataclasses import dataclass
+from enum import Enum
 from typing import NamedTuple
 
 import pytest
+
+
+class CleanupPolicy(Enum):
+    TRUNCATE = "truncate"
+    DROP = "drop"
+
+
+@dataclass
+class LaunchConfiguration:
+    cleanup: CleanupPolicy = CleanupPolicy.DROP
 
 
 class ADCMVersionParam(NamedTuple):

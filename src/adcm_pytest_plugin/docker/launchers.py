@@ -74,7 +74,7 @@ class ADCMLauncher:  # pylint: disable=too-many-instance-attributes
     def _prepare_default_kwargs(self) -> dict:
         return {"remove": True}
 
-    def _run_adcm_container(self, kwargs_mutator: Callable[[dict], dict] = lambda d: d) -> Container:
+    def _run_adcm_container(self, image_name: str, kwargs_mutator: Callable[[dict], dict] = lambda d: d) -> Container:
         for _ in range(CONTAINER_START_RETRY_COUNT):
             kwargs = self._prepare_default_kwargs()
             for step in self._stages.prepare_run_arguments:
@@ -83,7 +83,7 @@ class ADCMLauncher:  # pylint: disable=too-many-instance-attributes
             final_kwargs = kwargs_mutator(kwargs)
             self.add_step_fact("last-launch-kwargs", {**final_kwargs})
             try:
-                return self._docker.containers.run(image=self.image_name, detach=True, **final_kwargs)
+                return self._docker.containers.run(image=image_name, detach=True, **final_kwargs)
             except APIError as err:
                 if (
                     "failed: port is already allocated" in err.explanation
@@ -128,7 +128,7 @@ class ADCMLauncher:  # pylint: disable=too-many-instance-attributes
         if not self._stages.prepare_image:
             return
 
-        container = self._run_adcm_container()
+        container = self._run_adcm_container(image_name=self.image_name)
         self.adcm = self._adcm_class(container, ip=self.bind_ip)
         self._wait_adcm_container_init()
 
@@ -145,8 +145,10 @@ class ADCMLauncher:  # pylint: disable=too-many-instance-attributes
         self.adcm = None
 
     @allure.step("Run ADCM")
-    def run(self, *, run_arguments_mutator: Callable[[dict], dict] = lambda x: x):
-        container = self._run_adcm_container(run_arguments_mutator)
+    def run(self, *, from_image: Optional[str] = None, run_arguments_mutator: Callable[[dict], dict] = lambda x: x):
+        container = self._run_adcm_container(
+            image_name=from_image or self.image_name, kwargs_mutator=run_arguments_mutator
+        )
         self.adcm = self._adcm_class(container, ip=self.bind_ip)
         self._wait_adcm_container_init()
 
@@ -171,10 +173,8 @@ class ADCMLauncher:  # pylint: disable=too-many-instance-attributes
         self.adcm.container.stop()
 
         image, tag = target
-        # if image was prepared
-        # this will lead to not deleted trash on cleanup image removal
-        self.image_name = f"{image}:{tag}"
-        self.run(run_arguments_mutator=lambda _: {**previous_run_kwargs})
+        self.run(from_image=f"{image}:{tag}", run_arguments_mutator=lambda _: {**previous_run_kwargs})
+
         return self.adcm
 
     @allure.step("Stop ADCM")
@@ -240,34 +240,33 @@ class ADCMWithPostgresLauncher(ADCMLauncher):
                 detach=True,
             )
 
-        with allure.step("Wait until container is started properly"):
-            wait_kwargs = {"attempts_": 30, "wait_between_": 0.2, "err_type_": RuntimeError}
-            with allure.step("Wait DB is up"):
-                retry(
-                    lambda: "database system is ready to accept connections" in container.logs(tail=15).decode("utf-8"),
-                    err_message_=lambda: f"Failed to start container:\n{container.logs().decode('utf-8').splitlines()}",
-                    **wait_kwargs,
-                )
-            with allure.step("Wait psql"):
-                retry(
-                    lambda: container.exec_run(["psql", "--username", "postgres", "-c", "\\dt"]).exit_code == 0,
-                    err_message_=lambda: f"psql is not available\n{container.logs().decode('utf-8').splitlines()}",
-                    **wait_kwargs,
-                )
+        wait_kwargs = {"attempts_": 30, "err_type_": RuntimeError}
+        with allure.step("Wait DB is up"):
+            retry(
+                lambda: "database system is ready to accept connections" in container.logs(tail=15).decode("utf-8"),
+                err_message_=lambda: f"Failed to start container:\n{container.logs().decode('utf-8').splitlines()}",
+                wait_between_=0.2,
+                **wait_kwargs,
+            )
 
-        with allure.step("Prepare database"):
-            for statement in (
-                "CREATE USER adcm WITH ENCRYPTED PASSWORD 'password';",
-                "CREATE DATABASE adcm OWNER adcm;",
-                "ALTER USER adcm CREATEDB;",
-            ):
-                with allure.step(f"Run '{statement}' in Postgres container"):
-                    result = container.exec_run(
-                        ["psql", "--username", "postgres", "--dbname", "postgres", "-c", statement]
-                    )
+        query = "CREATE USER adcm WITH ENCRYPTED PASSWORD 'password';"
+        with allure.step(f'Try to create database with query "{query}"'):
+            retry(
+                lambda: container.exec_run(
+                    ["psql", "--username", "postgres", "--dbname", "postgres", "-c", query]
+                ).exit_code
+                == 0,
+                err_message_="Failed to create database",
+                wait_between_=1,
+                **wait_kwargs,
+            )
 
-                    if result.exit_code != 0:
-                        raise RuntimeError(f"Failed to execute statement:\n{result.output.decode()}")
+        query = "CREATE DATABASE adcm OWNER adcm;"
+        with allure.step(f'Run "{query}" in DB container'):
+            result = container.exec_run(["psql", "--username", "postgres", "--dbname", "postgres", "-c", query])
+
+            if result.exit_code != 0:
+                raise RuntimeError(f"Failed to execute statement:\n{result.output.decode()}")
 
         return container
 

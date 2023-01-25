@@ -30,9 +30,9 @@ from urllib3 import Retry
 from version_utils import rpm
 
 from .fixtures import *  # noqa: F401, F403
-from .fixtures import ADCMVersionParam
 from .objects.actions import ActionRunInfo, ActionsRunReport, ActionsSpec
 from .params import *  # noqa: F401, F403
+from .params import ADCMVersionParam
 from .utils import allure_reporter, func_name_to_title
 
 options: Namespace = Namespace()
@@ -134,6 +134,17 @@ def pytest_addoption(parser):
         type=pathlib.Path,
         default=None,
         help="Enable collection of the called actions report to provided dir",
+    )
+
+    parser.addoption(
+        "--launch-option",
+        "--lo",
+        action="append",
+        required=False,
+        help=""
+        "Pass options to configure ADCM launch. "
+        "Format {option}:{value}. "
+        "To provide multiple use: -lo option1:value1 -lo option2:value2",
     )
 
 

@@ -14,7 +14,10 @@
 import os
 import socket
 import uuid
+from dataclasses import asdict
+from enum import Enum
 from typing import Generator, Type
+from warnings import warn
 
 import allure
 import ifaddr
@@ -37,9 +40,10 @@ from adcm_pytest_plugin.docker.steps import (
     generate_ssl_certificate_for_adcm,
     get_http_and_https_ports,
     get_only_http_port,
+    cleanup_via_tables_drop,
 )
 from adcm_pytest_plugin.docker.utils import is_docker
-from adcm_pytest_plugin.params import ADCMVersionParam
+from adcm_pytest_plugin.params import ADCMVersionParam, LaunchConfiguration, CleanupPolicy
 from adcm_pytest_plugin.utils import allure_reporter, check_mutually_exclusive
 
 ##################################################
@@ -152,6 +156,46 @@ def cmd_opts(request):
     return cmd_opts
 
 
+@allure.title("Configure launch policy")
+@pytest.fixture(scope="session")
+def launch_configuration(cmd_opts) -> LaunchConfiguration:
+    # fill the defaults
+    configuration = LaunchConfiguration()
+
+    if not cmd_opts.launch_option:
+        return configuration
+
+    processed_options = set()
+    for option in cmd_opts.launch_option:
+        name, value = option.split(":", maxsplit=1)
+
+        if name in processed_options:
+            raise RuntimeError(f"Duplicate of {name} option. Provide exactly one value for it.")
+
+        processed_options.add(name)
+
+        if not hasattr(configuration, name):
+            raise RuntimeError(f"Incorrect launch option: {name}. Available: {', '.join(asdict(configuration).keys())}")
+
+        default_value = getattr(configuration, name)
+
+        if not isinstance(default_value, Enum):
+            # just set raw value, so everything but enums will be strings
+            setattr(configuration, name, value)
+            continue
+
+        try:
+            setattr(configuration, name, default_value.__class__(value))
+            continue
+        except ValueError as err:
+            raise RuntimeError(
+                f"Incorrect value '{value}' for '{name}'. "
+                f"Available values are: {', '.join(item.value for item in default_value.__class__)}."
+            ) from err
+
+    return configuration
+
+
 @pytest.fixture(scope="session")
 def docker_client(cmd_opts) -> DockerClient:
     if cmd_opts.remote_docker:
@@ -253,7 +297,7 @@ def adcm_https(request) -> bool:
 
 @allure.title("Prepare lifecycle stages")
 @pytest.fixture(scope="session")
-def stages(cmd_opts, adcm_https, launcher_class, adcm_is_upgradable):
+def stages(cmd_opts, adcm_https, launcher_class, adcm_is_upgradable, launch_configuration):
     prepare_image_steps = []
     prepare_run_arguments_steps = []
     on_cleanup_steps = []
@@ -267,22 +311,27 @@ def stages(cmd_opts, adcm_https, launcher_class, adcm_is_upgradable):
 
     if adcm_https:
         prepare_image_steps.append(generate_ssl_certificate_for_adcm)
-        # prepare_run_arguments_steps.append(mount_ssl_certs)
         prepare_run_arguments_steps.append(get_http_and_https_ports)
         on_cleanup_steps.append(cleanup_ssl_certificate_directory)
     else:
         prepare_run_arguments_steps.append(get_only_http_port)
 
+    if adcm_is_upgradable:
+        prepare_run_arguments_steps.append(
+            lambda _1, d: {
+                "volumes": {**d.get("volumes", {}), str(uuid.uuid4())[-12:]: {"bind": "/adcm/data", "mode": "rw"}}
+            }
+        )
+
     # ADCM version based modifiers
     if launcher_class == ADCMWithPostgresLauncher:
-        pre_stop_steps += [attach_postgres_data_dir, cleanup_via_truncate]
-    else:
-        if adcm_is_upgradable:
-            prepare_run_arguments_steps.append(
-                lambda _1, d: {
-                    "volumes": {**d.get("volumes", {}), str(uuid.uuid4())[-12:]: {"bind": "/adcm/data", "mode": "rw"}}
-                }
-            )
+        pre_stop_steps.append(attach_postgres_data_dir)
+        if launch_configuration.cleanup == CleanupPolicy.TRUNCATE:
+            pre_stop_steps.append(cleanup_via_truncate)
+        elif launch_configuration.cleanup == CleanupPolicy.DROP:
+            pre_stop_steps.append(cleanup_via_tables_drop)
+        else:
+            warn(f"Cleanup policy not configured. Value is '{launch_configuration.cleanup}'")
 
     return Stages(
         prepare_image=prepare_image_steps,
