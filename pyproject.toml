@@ -25,7 +25,7 @@ ignore-paths = [
 good-names = ["i", "j", "k", "v", "ip"]
 
 [tool.pylint.messages_control]
-disable = []
+disable = ["missing-docstring"]
 
 [tool.pylint.format]
 max-line-length = 120

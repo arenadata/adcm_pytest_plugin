@@ -9,13 +9,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
----
-- name: Dummy action
-  hosts: all
-  connection: local
-  gather_facts: no
 
-  tasks:
-    - name: Dummy?
-      debug:
-        msg: "Some message"
+from docker.models.containers import Container
+
+
+class PostgreSQL:  # pylint: disable=too-few-public-methods
+    def __init__(self, container: Container):
+        self.container = container

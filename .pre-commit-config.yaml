@@ -20,6 +20,5 @@ repos:
           - requests
           - version_utils
           - ifaddr
-          - retry
           - deprecated
           - coreapi

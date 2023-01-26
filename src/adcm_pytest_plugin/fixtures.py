@@ -10,246 +10,45 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Fixtures of ADCM image and ADCM client"""
+
+import os
 import socket
-import time
 import uuid
-from contextlib import suppress
-from typing import Generator
+from dataclasses import asdict
+from enum import Enum
+from typing import Generator, Type
+from warnings import warn
 
 import allure
-import docker
 import ifaddr
 import pytest
 from _pytest.fixtures import SubRequest
 from _pytest.terminal import TerminalReporter
 from adcm_client.objects import ADCMClient
 from allure_commons.utils import uuid4
+from docker import DockerClient, from_env
 from docker.utils import parse_repository_tag
-from requests.exceptions import ReadTimeout as DockerReadTimeout
 
-from adcm_pytest_plugin import utils
-
-from .docker_utils import (
-    ADCM,
-    ADCMInitializer,
-    ContainerConfig,
-    DockerWrapper,
-    gather_adcm_data_from_container,
-    is_docker,
-    remove_container_volumes,
-    remove_docker_image,
+from adcm_pytest_plugin.constants import DEFAULT_IP
+from adcm_pytest_plugin.docker.adcm import ADCM
+from adcm_pytest_plugin.docker.launchers import ADCMLauncher, ADCMWithPostgresLauncher, Stages
+from adcm_pytest_plugin.docker.steps import (
+    attach_adcm_data_dir,
+    attach_postgres_data_dir,
+    cleanup_ssl_certificate_directory,
+    cleanup_via_truncate,
+    generate_ssl_certificate_for_adcm,
+    get_http_and_https_ports,
+    get_only_http_port,
+    cleanup_via_tables_drop,
 )
-from .utils import allure_reporter, check_mutually_exclusive
+from adcm_pytest_plugin.docker.utils import is_docker
+from adcm_pytest_plugin.params import ADCMVersionParam, LaunchConfiguration, CleanupPolicy
+from adcm_pytest_plugin.utils import allure_reporter, check_mutually_exclusive
 
-DATADIR = utils.get_data_dir(__file__)
-
-__all__ = [
-    "image",
-    "cmd_opts",
-    "bind_container_ip",
-    "adcm_fs",
-    "adcm_ss",
-    "adcm_ms",
-    "extra_adcm_fs",
-    "adcm_is_upgradable",
-    "adcm_https",
-    "sdk_client_ms",
-    "sdk_client_fs",
-    "sdk_client_ss",
-    "adcm_api_credentials",
-    "additional_adcm_init_config",
-]
-
-
-@allure.title("ADCM credentials")
-@pytest.fixture(scope="session")
-def adcm_api_credentials() -> dict:
-    """ADCM credentials for use in tests"""
-    return {"user": "admin", "password": "admin"}
-
-
-@allure.title("Additional ADCM init config")
-@pytest.fixture(scope="session")
-def additional_adcm_init_config() -> dict:
-    """
-    Add options for ADCM init.
-    Redefine this fixture in the actual project to alter additional options of ADCM initialisation.
-    Ex. If this fixture will return {"fill_dummy_data": True}
-    then on the init stage dummy objects will be added to ADCM image
-    """
-    return {}
-
-
-# pylint: disable=redefined-outer-name
-@allure.title("Bind container IP")
-@pytest.fixture(scope="session")
-def bind_container_ip(cmd_opts):
-    """Get ip binding to container"""
-    if cmd_opts.remote_docker:
-        ip = cmd_opts.remote_docker.split(":")[0]
-    else:
-        ip = _get_connection_ip(cmd_opts.remote_executor_host) if cmd_opts.remote_executor_host else None
-        if ip and is_docker() and _get_if_type(ip) == "0":
-            raise EnvironmentError(
-                "You are using network interface with 'bridge' "
-                "type while running inside container."
-                "There is no obvious way to get external ip in this case."
-                "Try running container with pytest with --net=host option"
-            )
-    return ip
-
-
-# pylint: disable=redefined-outer-name, too-many-arguments
-@allure.title("ADCM Image")
-@pytest.fixture(scope="session")
-def image(request, cmd_opts, bind_container_ip, adcm_api_credentials, additional_adcm_init_config, adcm_https):
-    """That fixture creates ADCM container, waits until
-    a database becomes initialised and stores that as images
-    with random tag and name local/adcminit
-    That can be useful to use that fixture to make ADCM's
-    container startup time shorter.
-    Operates with cmd-opts:
-     '--staticimage INIT_IMAGE'
-     '--adcm-image IMAGE'
-     '--remote-docker HOST:PORT'
-     '--dontstop'
-     '--nopull'
-    Fixture returns list:
-    repo, tag
-    """
-
-    mutually_exclusive_opts = [
-        ["adcm_image", "adcm_images", "adcm_min_version"],
-        ["staticimage", "adcm_images", "adcm_min_version"],
-    ]
-    # if more than one option that defines image params is used raise exception
-    # pytest don't allow more convenient mechanisms to add mutually exclusive options.
-    for opt_sets in mutually_exclusive_opts:
-        if check_mutually_exclusive(cmd_opts, *opt_sets):
-            raise Exception(f"wrong using of import parameters {', '.join(opt_sets)} are mutually exclusive")
-
-    if cmd_opts.remote_docker:
-        docker_client = docker.DockerClient(base_url=f"tcp://{cmd_opts.remote_docker}", timeout=120)
-    else:
-        docker_client = docker.from_env(timeout=120)
-
-    params = {}
-    if cmd_opts.staticimage:
-        params["repo"], params["tag"] = parse_repository_tag(cmd_opts.staticimage)
-    # if image fixture was indirectly parametrized
-    # use 'adcm_repo' and 'adcm_tag' from parametrisation
-    if hasattr(request, "param"):
-        adcm_repo, adcm_tag = request.param
-    # if there is no parametrization check if adcm_image option is passed
-    elif cmd_opts.adcm_image:
-        adcm_repo, adcm_tag = parse_repository_tag(cmd_opts.adcm_image)
-    else:
-        adcm_repo, adcm_tag = None, None
-
-    container_config = ContainerConfig(
-        image=adcm_repo,
-        tag=adcm_tag,
-        bind_ip=bind_container_ip,
-        remove=False,
-        pull=not cmd_opts.nopull,
-        https=adcm_https,
-    )
-    initializer = ADCMInitializer(
-        container_config=container_config,
-        dc=docker_client,
-        adcm_api_credentials=adcm_api_credentials,
-        **params,
-        **additional_adcm_init_config,
-    )
-    init_image = initializer.get_initialized_adcm_image()
-
-    yield init_image["repo"], init_image["tag"]
-
-    initializer.cleanup()
-
-    if cmd_opts.dontstop or cmd_opts.staticimage:
-        return  # leave image intact
-
-    remove_docker_image(**init_image, dc=docker_client)
-
-
-def _adcm(image, request, bind_container_ip, upgradable=False, https=False) -> Generator[ADCM, None, None]:
-    repo, tag = image
-    cmd_opts = request.config.option
-    labels = {"pytest_node_id": request.node.nodeid}
-    # this option can be passed from private adcm-pytest-tools (check its README.md for more info)
-    if hasattr(cmd_opts, "debug_owner") and cmd_opts.debug_owner:
-        labels["debug_owner"] = cmd_opts.debug_owner
-    docker_url = None
-    if cmd_opts.remote_docker:
-        docker_url = f"tcp://{cmd_opts.remote_docker}"
-        docker_wrapper = DockerWrapper(base_url=docker_url)
-    else:
-        docker_wrapper = DockerWrapper()
-    volumes = {}
-    if upgradable:
-        volume_name = str(uuid.uuid4())[-12:]
-        volumes.update({volume_name: {"bind": "/adcm/shadow", "mode": "rw"}})
-    adcm = ADCM(
-        docker_wrapper=docker_wrapper,
-        container_config=ContainerConfig(
-            image=repo,
-            tag=tag,
-            pull=False,
-            bind_ip=bind_container_ip,
-            labels=labels,
-            volumes=volumes,
-            docker_url=docker_url,
-            https=https,
-        ),
-    )
-
-    if request.config.option.dontstop:
-        _print_adcm_url(request.config.pluginmanager.get_plugin("terminalreporter"), adcm)
-
-    yield adcm
-
-    if request.config.option.dontstop:
-        _attach_adcm_url(request, adcm)
-        return  # leave container intact
-
-    gather = True
-    # If there is no rep_call attribute, presumably test setup failed,
-    # or fixture scope is not function. Will collect /adcm/data anyway.
-    with suppress(AttributeError):
-        if not request.node.rep_call.failed:
-            gather = False
-    if gather:
-        _attach_adcm_logs(request, adcm)
-
-    with suppress(DockerReadTimeout):
-        adcm.stop()
-
-    remove_container_volumes(adcm.container, docker_wrapper.client)
-
-
-@allure.step("Gather /adcm/data/ from ADCM container")
-def _attach_adcm_logs(request: SubRequest, adcm: ADCM):
-    """Gather /adcm/data/ form the ADCM container and attach it to the Allure Report"""
-    file_name = f"ADCM Log {request.node.name}_{time.time()}"
-    reporter = allure_reporter(request.config)
-    if reporter:
-        test_result = reporter.get_test(uuid=None)
-        with gather_adcm_data_from_container(adcm) as data:
-            reporter.attach_data(
-                uuid=uuid4(),
-                body=data,
-                name=f"{file_name}.tgz",
-                extension="tgz",
-                parent_uuid=test_result.uuid,
-            )
-    else:
-        with gather_adcm_data_from_container(adcm) as data:
-            allure.attach(
-                body=data,
-                name=f"{file_name}.tgz",
-                extension="tgz",
-            )
+##################################################
+#              U T I L I T I E S
+##################################################
 
 
 def _attach_adcm_url(request: SubRequest, adcm: ADCM):
@@ -309,64 +108,173 @@ def _get_if_type(if_ip):
         return file.readline().strip()
 
 
-##################################################
-#                  S D K
-##################################################
-@allure.title("[MS] ADCM Container")
-@pytest.fixture(scope="module")
-def adcm_ms(
-    image, request, adcm_is_upgradable: bool, adcm_https: bool, bind_container_ip
-) -> Generator[ADCM, None, None]:
-    """Runs adcm container from the previously initialized image.
-    Operates '--dontstop' option.
-    Returns authorized instance of ADCM object
-    """
-    yield from _adcm(
-        image, request, upgradable=adcm_is_upgradable, https=adcm_https, bind_container_ip=bind_container_ip
+def _adcm(request, container_launcher: ADCMLauncher):
+    dontstop = request.config.option.dontstop
+
+    container_launcher.run(
+        run_arguments_mutator=lambda run_kwargs: {
+            **run_kwargs,
+            # Can't set nodeid before, so have to pass it to run
+            "labels": {**run_kwargs.get("labels", {}), "pytest_node_id": request.node.nodeid},
+        }
     )
 
+    if dontstop:
+        _print_adcm_url(request.config.pluginmanager.get_plugin("terminalreporter"), container_launcher.adcm)
 
-@allure.title("[FS] ADCM Container")
-@pytest.fixture(scope="function")
-def adcm_fs(
-    image, request, adcm_is_upgradable: bool, adcm_https: bool, bind_container_ip
-) -> Generator[ADCM, None, None]:
-    """Runs adcm container from the previously initialized image.
-    Operates '--dontstop' option.
-    Returns authorized instance of ADCM object
-    """
-    yield from _adcm(
-        image, request, upgradable=adcm_is_upgradable, https=adcm_https, bind_container_ip=bind_container_ip
-    )
+    yield container_launcher.adcm
+
+    if dontstop:
+        _attach_adcm_url(request, container_launcher.adcm)
+        return  # leave container intact
+
+    container_launcher.stop(request)
 
 
-@allure.title("[SS] ADCM Container")
+##################################################
+#              G E N E R A L
+##################################################
+
+
+# pylint: disable=redefined-outer-name
+
+
+@allure.title("Pytest options")
 @pytest.fixture(scope="session")
-def adcm_ss(
-    image, request, adcm_is_upgradable: bool, adcm_https: bool, bind_container_ip
-) -> Generator[ADCM, None, None]:
-    """Runs adcm container from the previously initialized image.
-    Operates '--dontstop' option.
-    Returns authorized instance of ADCM object
-    """
-    yield from _adcm(
-        image, request, upgradable=adcm_is_upgradable, https=adcm_https, bind_container_ip=bind_container_ip
-    )
+def cmd_opts(request):
+    """Returns pytest request options object"""
+    cmd_opts = request.config.option
+    mutually_exclusive_opts = [
+        ["adcm_image", "adcm_images", "adcm_min_version"],
+    ]
+    # if more than one option that defines image params is used raise exception
+    # pytest don't allow more convenient mechanisms to add mutually exclusive options.
+    for opt_sets in mutually_exclusive_opts:
+        if check_mutually_exclusive(cmd_opts, *opt_sets):
+            raise Exception(f"wrong using of import parameters {', '.join(opt_sets)} are mutually exclusive")
+
+    return cmd_opts
 
 
-@allure.title("[FS] Additional ADCM Container")
-@pytest.fixture()
-def extra_adcm_fs(
-    image, request, adcm_is_upgradable: bool, adcm_https: bool, bind_container_ip
-) -> Generator[ADCM, None, None]:
+@allure.title("Configure launch policy")
+@pytest.fixture(scope="session")
+def launch_configuration(cmd_opts) -> LaunchConfiguration:
+    # fill the defaults
+    configuration = LaunchConfiguration()
+
+    if not cmd_opts.launch_option:
+        return configuration
+
+    processed_options = set()
+    for option in cmd_opts.launch_option:
+        name, value = option.split(":", maxsplit=1)
+
+        if name in processed_options:
+            raise RuntimeError(f"Duplicate of {name} option. Provide exactly one value for it.")
+
+        processed_options.add(name)
+
+        if not hasattr(configuration, name):
+            raise RuntimeError(f"Incorrect launch option: {name}. Available: {', '.join(asdict(configuration).keys())}")
+
+        default_value = getattr(configuration, name)
+
+        if not isinstance(default_value, Enum):
+            # just set raw value, so everything but enums will be strings
+            setattr(configuration, name, value)
+            continue
+
+        try:
+            setattr(configuration, name, default_value.__class__(value))
+            continue
+        except ValueError as err:
+            raise RuntimeError(
+                f"Incorrect value '{value}' for '{name}'. "
+                f"Available values are: {', '.join(item.value for item in default_value.__class__)}."
+            ) from err
+
+    return configuration
+
+
+@pytest.fixture(scope="session")
+def docker_client(cmd_opts) -> DockerClient:
+    if cmd_opts.remote_docker:
+        return DockerClient(base_url=f"tcp://{cmd_opts.remote_docker}", timeout=120)
+
+    return from_env(timeout=120)
+
+
+# pylint: disable=redefined-outer-name
+@allure.title("Bind container IP")
+@pytest.fixture(scope="session")
+def bind_container_ip(cmd_opts) -> str:
+    """Get ip binding to container"""
+    if cmd_opts.remote_docker:
+        return cmd_opts.remote_docker.split(":")[0]
+
+    if not cmd_opts.remote_executor_host:
+        return DEFAULT_IP
+
+    ip = _get_connection_ip(cmd_opts.remote_executor_host)
+    if ip and is_docker() and _get_if_type(ip) == "0":
+        raise EnvironmentError(
+            "You are using network interface with 'bridge' "
+            "type while running inside container."
+            "There is no obvious way to get external ip in this case."
+            "Try running container with pytest with --net=host option"
+        )
+    return ip
+
+
+##################################################
+#          S T A R T U P   A D C M
+##################################################
+
+
+@allure.title("Image version to base ADCM upon")
+@pytest.fixture(scope="session")
+def image(request, cmd_opts, docker_client) -> ADCMVersionParam:
     """
-    Runs additional ADCM container from the previously initialized image.
-    Operates '--dontstop' option.
-    Returns authorized instance of ADCM object
+    Handle what image version(s) will be used to start ADCM
     """
-    yield from _adcm(
-        image, request, upgradable=adcm_is_upgradable, https=adcm_https, bind_container_ip=bind_container_ip
-    )
+
+    if hasattr(request, "param"):
+        # image fixture was indirectly parametrized
+        # in most cases it's the way to "correctly" launch tests on various ADCM versions
+        param = request.param
+        if isinstance(param, ADCMVersionParam):  # new version of parametrization that provides "full" info
+            version = request.param
+        else:  # consider it's a legacy parametrization, use 'repo' and 'tag' from parametrization
+            repository, tag = request.param
+            version = ADCMVersionParam(repository=repository, tag=tag, with_postgres=False)
+    elif cmd_opts.adcm_image:
+        # if there is no parametrization check if adcm_image option is passed
+        repository, tag = parse_repository_tag(cmd_opts.adcm_image)
+        version = ADCMVersionParam(repository=repository, tag=tag, with_postgres=not cmd_opts.no_postgres)
+    else:
+        # set default otherwise
+        version = ADCMVersionParam(repository="hub.arenadata.io/adcm/adcm", tag="latest", with_postgres=True)
+
+    with allure.step(f"ADCM image settings: {version}"):
+        ...
+
+    if cmd_opts.nopull:
+        with allure.step("Skip pulling ADCM from remote repo"):
+            return version
+
+    with allure.step(f'Pull ADCM "{version.tag}" from repository "{version.repository}"'):
+        docker_client.images.pull(repository=version.repository, tag=version.tag)
+
+    return version
+
+
+@allure.title("Pick ADCM implementation")
+@pytest.fixture(scope="session")
+def launcher_class(image) -> Type[ADCMLauncher]:
+    """
+    Decide what ADCM launcher to use
+    """
+    return ADCMWithPostgresLauncher if image.with_postgres else ADCMLauncher
 
 
 @allure.title("[SS] ADCM upgradable flag")
@@ -381,10 +289,111 @@ def adcm_is_upgradable(request) -> bool:
 @allure.title("[SS] ADCM https flag")
 @pytest.fixture(scope="session")
 def adcm_https(request) -> bool:
-    """Set flag that controls either ADCM will be upgradable or not"""
+    """Set flag that controls either will ADCM have SSL cert and opened https port or not"""
     if hasattr(request, "param") and request.param:
         return True
     return False
+
+
+@allure.title("Prepare lifecycle stages")
+@pytest.fixture(scope="session")
+def stages(cmd_opts, adcm_https, launcher_class, adcm_is_upgradable, launch_configuration):
+    prepare_image_steps = []
+    prepare_run_arguments_steps = []
+    on_cleanup_steps = []
+    pre_stop_steps = [attach_adcm_data_dir]
+
+    if hasattr(cmd_opts, "debug_owner") and (owner := cmd_opts.debug_owner):
+        prepare_run_arguments_steps.append(lambda _1, _2: {"labels": {"debug_owner": owner}})
+
+    if build_tag := os.environ.get("BUILD_TAG"):
+        prepare_run_arguments_steps.append(lambda _, d: {"labels": {"jenkins-job": build_tag, **d.get("labels", {})}})
+
+    if adcm_https:
+        prepare_image_steps.append(generate_ssl_certificate_for_adcm)
+        prepare_run_arguments_steps.append(get_http_and_https_ports)
+        on_cleanup_steps.append(cleanup_ssl_certificate_directory)
+    else:
+        prepare_run_arguments_steps.append(get_only_http_port)
+
+    if adcm_is_upgradable:
+        prepare_run_arguments_steps.append(
+            lambda _1, d: {
+                "volumes": {**d.get("volumes", {}), str(uuid.uuid4())[-12:]: {"bind": "/adcm/data", "mode": "rw"}}
+            }
+        )
+
+    # ADCM version based modifiers
+    if launcher_class == ADCMWithPostgresLauncher:
+        pre_stop_steps.append(attach_postgres_data_dir)
+        if launch_configuration.cleanup == CleanupPolicy.TRUNCATE:
+            pre_stop_steps.append(cleanup_via_truncate)
+        elif launch_configuration.cleanup == CleanupPolicy.DROP:
+            pre_stop_steps.append(cleanup_via_tables_drop)
+        else:
+            warn(f"Cleanup policy not configured. Value is '{launch_configuration.cleanup}'")
+
+    return Stages(
+        prepare_image=prepare_image_steps,
+        prepare_run_arguments=prepare_run_arguments_steps,
+        pre_stop=pre_stop_steps,
+        on_cleanup=on_cleanup_steps,
+    )
+
+
+@allure.title("Initiate launcher")
+@pytest.fixture(scope="session")
+def launcher(
+    image: ADCMVersionParam, docker_client, bind_container_ip, launcher_class, stages
+) -> Generator[ADCMLauncher, None, None]:
+    launcher = launcher_class(
+        adcm_image=(image.repository, image.tag),
+        docker_client=docker_client,
+        bind_ip=bind_container_ip,
+        stages=stages,
+    )
+
+    launcher.prepare()
+
+    yield launcher
+
+    launcher.cleanup()
+
+
+@allure.title("[MS] ADCM Container")
+@pytest.fixture(scope="module")
+def adcm_ms(request, launcher) -> Generator[ADCM, None, None]:
+    yield from _adcm(request=request, container_launcher=launcher)
+
+
+@allure.title("[FS] ADCM Container")
+@pytest.fixture(scope="function")
+def adcm_fs(request, launcher) -> Generator[ADCM, None, None]:
+    yield from _adcm(request=request, container_launcher=launcher)
+
+
+@allure.title("[SS] ADCM Container")
+@pytest.fixture(scope="session")
+def adcm_ss(request, launcher) -> Generator[ADCM, None, None]:
+    yield from _adcm(request=request, container_launcher=launcher)
+
+
+@allure.title("[FS] Additional ADCM Container")
+@pytest.fixture()
+def extra_adcm_fs(request, launcher) -> Generator[ADCM, None, None]:
+    yield from _adcm(request=request, container_launcher=launcher)
+
+
+##################################################
+#                  S D K
+##################################################
+
+
+@allure.title("ADCM credentials")
+@pytest.fixture(scope="session")
+def adcm_api_credentials() -> dict:
+    """ADCM credentials for use in tests"""
+    return {"user": "admin", "password": "admin"}
 
 
 @allure.title("[MS] ADCM Client")
@@ -406,10 +415,3 @@ def sdk_client_fs(adcm_fs: ADCM, adcm_api_credentials) -> ADCMClient:
 def sdk_client_ss(adcm_ss: ADCM, adcm_api_credentials) -> ADCMClient:
     """Returns ADCMClient object from adcm_client"""
     return ADCMClient(url=adcm_ss.url, **adcm_api_credentials)
-
-
-@allure.title("Pytest options")
-@pytest.fixture(scope="session")
-def cmd_opts(request):
-    """Returns pytest request options object"""
-    return request.config.option

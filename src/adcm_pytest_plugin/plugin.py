@@ -11,6 +11,7 @@
 # limitations under the License.
 
 """Main module of plugin with options and hooks"""
+
 # pylint: disable=wildcard-import,unused-wildcard-import
 import itertools
 import json
@@ -18,7 +19,7 @@ import os
 import pathlib
 import shutil
 from argparse import Namespace
-from typing import Iterator, List
+from typing import Iterator, List, Optional, Tuple
 
 import pytest
 import requests
@@ -31,6 +32,7 @@ from version_utils import rpm
 from .fixtures import *  # noqa: F401, F403
 from .objects.actions import ActionRunInfo, ActionsRunReport, ActionsSpec
 from .params import *  # noqa: F401, F403
+from .params import ADCMVersionParam
 from .utils import allure_reporter, func_name_to_title
 
 options: Namespace = Namespace()
@@ -61,21 +63,18 @@ def pytest_addoption(parser):
     """Add plugin CLI options"""
 
     parser.addoption(
-        "--staticimage",
-        action="store",
-        default=None,
-        help="Use pre-initialised ADCM image. "
-        "If image doesn't exist then it will be created ones "
-        "and can be reused in future test runs. "
-        "Useful for tests development. You will save about 40 second on ADCM initialisation "
-        "Ex: arenadata/adcm:test or some_repo/some_image:some_tag",
-    )
-
-    parser.addoption(
         "--dontstop",
         action="store_true",
         default=False,
         help="Keep ADCM containers running after tests are finished",
+    )
+
+    parser.addoption(
+        "--no-postgres",
+        action="store_true",
+        default=False,
+        help="Provide this option to **avoid** trying to launch ADCM with PostgreSQL database. "
+        "ADCM+PostgreSQL is the default option",
     )
 
     parser.addoption(
@@ -137,6 +136,17 @@ def pytest_addoption(parser):
         help="Enable collection of the called actions report to provided dir",
     )
 
+    parser.addoption(
+        "--launch-option",
+        "--lo",
+        action="append",
+        required=False,
+        help=""
+        "Pass options to configure ADCM launch. "
+        "Format {option}:{value}. "
+        "To provide multiple use: -lo option1:value1 -lo option2:value2",
+    )
+
 
 def pytest_generate_tests(metafunc):
     """
@@ -146,23 +156,34 @@ def pytest_generate_tests(metafunc):
     """
     adcm_min_version = metafunc.config.getoption("adcm_min_version")
     adcm_images = metafunc.config.getoption("adcm_images")
+    with_postgres = not metafunc.config.getoption("no_postgres")
 
-    params, ids = parametrized_by_adcm_version(adcm_min_version=adcm_min_version, adcm_images=adcm_images)
+    params, ids = parametrized_by_adcm_version(
+        adcm_min_version=adcm_min_version, adcm_images=adcm_images, with_postgres=with_postgres
+    )
     if params:
         metafunc.parametrize("image", params, indirect=True, ids=ids)
 
 
-def parametrized_by_adcm_version(adcm_min_version=None, adcm_images=None):
+def parametrized_by_adcm_version(
+    adcm_min_version=None, adcm_images=None, with_postgres: bool = False
+) -> Tuple[Optional[List[ADCMVersionParam]], Optional[List[str]]]:
     """Return params with range from ADCM min version to current ADCM version"""
     params = None
     ids = None
     if adcm_min_version:
         repo = "hub.arenadata.io/adcm/adcm"
-        params = [[repo, tag] for tag in _get_adcm_new_versions_tags(adcm_min_version)]
-        ids = list(map(lambda x: x[1] if x[1] is not None else "latest", params))
+        params = [
+            ADCMVersionParam(repository=repo, tag=tag, with_postgres=with_postgres)
+            for tag in _get_adcm_new_versions_tags(adcm_min_version)
+        ]
+        ids = list(map(lambda x: x.tag if x.tag is not None else "latest", params))
     elif adcm_images:
-        params = [[repo, tag] for repo, tag in map(parse_repository_tag, adcm_images)]
-        ids = adcm_images
+        params = [
+            ADCMVersionParam(repository=repo, tag=tag, with_postgres=with_postgres)
+            for repo, tag in map(parse_repository_tag, adcm_images)
+        ]
+        ids = list(map(str, adcm_images))
     return params, ids
 
 
@@ -193,7 +214,9 @@ def _get_adcm_tags() -> List[str]:
     adapter = HTTPAdapter(max_retries=Retry())
     http = requests.Session()
     http.mount("https://", adapter)
-    artifacts_data = http.get("https://hub.arenadata.io/api/v2.0/projects/adcm/repositories/adcm/artifacts").json()
+    artifacts_data = http.get(
+        "https://hub.arenadata.io/api/v2.0/projects/adcm/repositories/adcm/artifacts", timeout=30
+    ).json()
     return list(itertools.chain.from_iterable([tag["name"] for tag in artifact["tags"]] for artifact in artifacts_data))
 
 

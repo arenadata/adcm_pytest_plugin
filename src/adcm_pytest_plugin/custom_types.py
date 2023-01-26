@@ -19,14 +19,14 @@ import pytest
 class SecureString(str):
     """
     Extension for the built-in str type
-    When instansiated value will be addded to the set of sensitive data that will be masked in console outputs
+    When instantiated value will be added to the set of sensitive data that will be masked in console outputs
     """
 
     def __new__(cls, value, *args, **kwargs):
         return super(SecureString, cls).__new__(cls, value)
 
     # pylint: disable=super-init-not-called
-    def __init__(self, value, *args, **kwargs):
+    def __init__(self, value, *_a, **_kw):
         if hasattr(pytest, "secure_data") and isinstance(pytest.secure_data, set):
             pytest.secure_data.add(value)
         else:
@@ -36,7 +36,7 @@ class SecureString(str):
 
     @staticmethod
     def make_all_nested_string_vals_secure(obj):
-        """Mask all occurances of sensitive string in dict and list objects"""
+        """Mask all occurrences of sensitive string in dict and list objects"""
         if isinstance(obj, str):
             obj = SecureString(obj)
         elif isinstance(obj, dict):

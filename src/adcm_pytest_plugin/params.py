@@ -9,6 +9,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """
 Params helpers for ADCM parametrizing
 Example:
@@ -19,19 +20,30 @@ Example:
     def test_some():
     ...
 """
+from dataclasses import dataclass
+from enum import Enum
+from typing import NamedTuple
 
 import pytest
 
-__all__ = ["including_https", "https_only", "clean_adcm_only"]
+
+class CleanupPolicy(Enum):
+    TRUNCATE = "truncate"
+    DROP = "drop"
+
+
+@dataclass
+class LaunchConfiguration:
+    cleanup: CleanupPolicy = CleanupPolicy.DROP
+
+
+class ADCMVersionParam(NamedTuple):
+    repository: str
+    tag: str
+    with_postgres: bool
 
 
 including_https = pytest.mark.parametrize(
     "adcm_https", [pytest.param(True, id="https"), pytest.param(False, id="http")], indirect=True
 )
 https_only = pytest.mark.parametrize("adcm_https", [True], indirect=True)
-
-clean_adcm_only = pytest.mark.parametrize(
-    "additional_adcm_init_config",
-    [pytest.param({}, id="clean_adcm")],
-    indirect=True,
-)
